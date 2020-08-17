@@ -8,7 +8,11 @@
 	EXTERN	msbios
 
 log:
-	call	___mbf32_setup_single
-	ld	ix,___mbf32_LOG
-	call	msbios
-	jp	___mbf32_return
+    call    ___mbf32_setup_single
+IF __CPU_INTEL__ || __CPU_GBZ80__
+    call    ___mbf32_LOG
+ELSE
+    ld      ix,___mbf32_LOG
+    call    msbios
+ENDIF
+    jp      ___mbf32_return

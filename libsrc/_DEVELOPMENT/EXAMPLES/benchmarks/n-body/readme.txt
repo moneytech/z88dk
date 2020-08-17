@@ -52,15 +52,15 @@ RESULTS
 =======
 
 1.
-Z88DK March 18, 2017
-zsdcc #9852 / new c library
-4191 bytes less page zero
+Z88DK June 28, 2020
+zsdcc #11690 / new
+4309 bytes less page zero
 
 first number error : 5 * 10^(-8)
 second number error: 1 * 10^(-4)
 
-cycle count  = 2244963926
-time @ 4MHz  = 2244963926 / 4*10^6 = 9 min 21 sec
+cycle count  = 2247439592
+time @ 4MHz  = 2247439592 / 4*10^6 = 9 min 22 sec
 
 Internal 48-bit float implementation causes relative slowdown.
 
@@ -98,6 +98,69 @@ cycle count  = 5306393684
 time @ 4MHz  = 5306393684 / 4*10^6 = 22 min 07 sec
 
 Slow speed & large size due to float implementation in C.
+
+5.
+Z88DK April 20, 2020
+sccz80 / classic c library
+3814 bytes less page zero
+
+first number error : 5 * 10^(-8)
+second number error: 1 * 10^(-8)
+
+cycle count  = 3624577433
+time @ 4MHz  = 3624577433 / 4*10^6 = 15 min 06 sec
+
+Internal 48-bit float implementation causes relative slowdown.
+
+6.
+Z88DK June 28, 2020
+sccz80 / new c library
+3608 bytes less page zero
+
+first number error : 5 * 10^(-8)
+second number error: 1 * 10^(-4)
+
+cycle count  = 2372283755
+time @ 4MHz  = 2372283755 / 4*10^6 = 9 min 53 sec
+
+Internal 48-bit float implementation causes relative slowdown.
+
+7.
+Z88DK April 20, 2020
+zsdcc #11566 / classic
+4770 bytes less page zero
+
+first number error : 5 * 10^(-8)
+second number error: 1 * 10^(-8)
+
+cycle count  = 2253531346
+time @ 4MHz  = 2253531346 / 4*10^6 = 9 min 23 sec
+
+8.
+Z88DK June 28, 2020
+sccz80 / new / math32
+5264 bytes less page zero
+
+first number error : 5 * 10^(-7)
+second number error: 1 * 10^(-4)
+
+cycle count  = 1025105884
+time @ 4MHz  = 1025105884 / 4*10^6 = 4 min 16 sec
+
+IEEE 32-bit float implementation, accurate to 7 significant digits.
+
+9.
+Z88DK June 28, 2020
+sccz80 / new / math16
+3222 bytes less page zero
+
+first number error : 5 * 10^(-4)
+second number error: 5 * 10^(-2)
+
+cycle count  = 384070543
+time @ 4MHz  = 384070543 / 4*10^6 = 1 min 36 sec
+
+IEEE 16-bit float implementation, accurate to 3 significant digits.
 
 DQ.
 HITECH C CPM V309

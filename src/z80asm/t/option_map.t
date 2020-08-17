@@ -3,7 +3,7 @@
 # Z88DK Z80 Macro Assembler
 #
 # Copyright (C) Gunther Strube, InterLogic 1993-99
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
 # Repository: https://github.com/z88dk/z88dk/
 #
@@ -61,19 +61,17 @@ check_bin_file("test.bin", $bin);
 
 
 # -m, no symbols
-for my $opt ('-m', '--map') {
-	unlink_testfiles();
-	spew("test.asm", $asm_s);
-	spew("test1.asm", $asm1_s);
-	run("z80asm -b $opt test.asm test1.asm");
-	ok -f "test.map", "found test.map";
-	check_bin_file("test.bin", $bin);
-	check_text_file("test.map", <<'END');
+unlink_testfiles();
+spew("test.asm", $asm_s);
+spew("test1.asm", $asm1_s);
+run("z80asm -b -m test.asm test1.asm");
+ok -f "test.map", "found test.map";
+check_bin_file("test.bin", $bin);
+check_text_file("test.map", <<'END');
 		__head                          = $0000 ; const, public, def, , ,
 		__tail                          = $000B ; const, public, def, , ,
 		__size                          = $000B ; const, public, def, , ,
 END
-}
 
 
 # -m, symbols

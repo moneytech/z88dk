@@ -3,7 +3,7 @@
 # Z88DK Z80 Macro Assembler
 #
 # Copyright (C) Gunther Strube, InterLogic 1993-99
-# Copyright (C) Paulo Custodio, 2011-2018
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
 # Repository: https://github.com/z88dk/z88dk/
 #
@@ -27,7 +27,7 @@ END
 
 check_bin_file("test.bin", pack("C*", 0, 1));
 z80nm("test.o", <<'END');
-Object  file test.o at $0000: Z80RMF12
+Object  file test.o at $0000: Z80RMF14
   Name: test
   Section "": 2 bytes
     C $0000: 00 01

@@ -3,9 +3,9 @@
 # Z88DK Z80 Macro Assembler
 #
 # Copyright (C) Gunther Strube, InterLogic 1993-99
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
-# Repository: https://github.com/pauloscustodio/z88dk-z80asm
+# Repository: https://github.com/z88dk/z88dk
 #
 # Test error messages
 
@@ -40,7 +40,7 @@ t_z80asm_error('
 
 unlink_testfiles();
 write_file(asm_file(), "nop");
-t_z80asm_capture("-b -ixxxx ".asm_file(), "",
+t_z80asm_capture("-b -lxxxx ".asm_file(), "",
 		"Error: cannot read file 'xxxx.lib'\n",
 		1);
 
@@ -60,7 +60,7 @@ t_z80asm_capture("-b -d ".o_file(),
 unlink_testfiles();
 
 write_file(asm_file(), <<'ASM');
-	extern G_32769, G_32768, G_129, G_128, G0, G127, G128, G255, G256, G65535, G65536
+	extern G_129, G_128, G0, G127, G128, G255, G256
 
 ; Byte = -129
 	ld	a, L_129
@@ -102,45 +102,19 @@ write_file(asm_file(), <<'ASM');
 	ld	(ix + G128), -1
 	ld	(ix + G0 + 128), -1
 
-; Word = -32769
-	ld	bc, L_32769
-	ld	bc, G_32769
-	ld	bc, G0 - 32769
-
-; Word = -32768
-	ld	bc, L_32768
-	ld	bc, G_32768
-	ld	bc, G0 - 32768
-
-; Word = 65535
-	ld	bc, L65535
-	ld	bc, G65535
-	ld	bc, G0 + 65535
-
-; Word = 65536
-	ld	bc, L65536
-	ld	bc, G65536
-	ld	bc, G0 + 65536
-
 ; Local variables
-	defc L_32769 = -32769
-	defc L_32768 = -32768
 	defc L_129   = -129
 	defc L_128   = -128
 	defc L255    =  255
 	defc L256    =  256
 	defc L127    =  127
 	defc L128    =  128
-	defc L65535  =  65535
-	defc L65536  =  65536
 ASM
 
 write_file(asm1_file(), <<'ASM1');
 
 ; Global variables
-	public G_32769, G_32768, G_129, G_128, G0, G127, G128, G255, G256, G65535, G65536
-	defc G_32769 = -32769
-	defc G_32768 = -32768
+	public G_129, G_128, G0, G127, G128, G255, G256
 	defc G_129   = -129
 	defc G_128   = -128
 	defc G0      =  0
@@ -148,8 +122,6 @@ write_file(asm1_file(), <<'ASM1');
 	defc G128    =  128
 	defc G255    =  255
 	defc G256    =  256
-	defc G65535  =  65535
-	defc G65536  =  65536
 ASM1
 
 t_z80asm_capture("-b ".asm_file()." ".asm1_file(), "", <<'ERR', 0);
@@ -157,8 +129,6 @@ Warning at file 'test.asm' line 4: integer '-129' out of range
 Warning at file 'test.asm' line 19: integer '256' out of range
 Warning at file 'test.asm' line 24: integer '-129' out of range
 Warning at file 'test.asm' line 39: integer '128' out of range
-Warning at file 'test.asm' line 44: integer '-32769' out of range
-Warning at file 'test.asm' line 59: integer '65536' out of range
 Warning at file 'test.asm' line 5: integer '-129' out of range
 Warning at file 'test.asm' line 6: integer '-129' out of range
 Warning at file 'test.asm' line 20: integer '256' out of range
@@ -167,10 +137,6 @@ Warning at file 'test.asm' line 25: integer '-129' out of range
 Warning at file 'test.asm' line 26: integer '-129' out of range
 Warning at file 'test.asm' line 40: integer '128' out of range
 Warning at file 'test.asm' line 41: integer '128' out of range
-Warning at file 'test.asm' line 45: integer '-32769' out of range
-Warning at file 'test.asm' line 46: integer '-32769' out of range
-Warning at file 'test.asm' line 60: integer '65536' out of range
-Warning at file 'test.asm' line 61: integer '65536' out of range
 ERR
 
 t_binary(read_binfile(bin_file()), pack("C*",
@@ -198,18 +164,6 @@ t_binary(read_binfile(bin_file()), pack("C*",
 		0xDD, 0x36, 0x80, 0xFF,
 		0xDD, 0x36, 0x80, 0xFF,
 		0xDD, 0x36, 0x80, 0xFF,
-		0x01, 0xFF, 0x7F,
-		0x01, 0xFF, 0x7F,
-		0x01, 0xFF, 0x7F,
-		0x01, 0x00, 0x80,
-		0x01, 0x00, 0x80,
-		0x01, 0x00, 0x80,
-		0x01, 0xFF, 0xFF,
-		0x01, 0xFF, 0xFF,
-		0x01, 0xFF, 0xFF,
-		0x01, 0x00, 0x00,
-		0x01, 0x00, 0x00,
-		0x01, 0x00, 0x00,
 ));
 
 # defvar out of range - tested in directives.t
@@ -292,7 +246,7 @@ write_file(asm_file(), "main: ret");
 t_z80asm_capture("-x".$lib." ".asm_file(), "", "", 0);
 ok -f $lib;
 write_file(asm_file(), "EXTERN main \n call main");
-t_z80asm_capture("-b -i".$lib." ".asm_file(), "",
+t_z80asm_capture("-b -l".$lib." ".asm_file(), "",
 		"Error at file 'test.asm' line 2: symbol 'main' not defined\n",
 		1);
 
@@ -404,7 +358,7 @@ my $obj = objfile(NAME => "test", CODE => [["", -1, 1, "\x00"]] );
 substr($obj,6,2)="99";		# change version
 write_file(o_file(), $obj);
 t_z80asm_capture("-b  ".o_file(), "", <<"END", 1);
-Error: object file 'test.o' version 99, expected version 12
+Error: object file 'test.o' version 99, expected version 14
 END
 
 #------------------------------------------------------------------------------
@@ -433,7 +387,6 @@ write_binfile(o_file(), objfile( NAME => "test",
 								   SYMBOLS => [ ["Z", "Z", "", 0, "ABCD", "", 0] ] ));
 t_z80asm_capture("-b -d ".o_file(),
 				 "",
-				 "Error at module 'test': file 'test.o' not an object file\n".
 				 "Error at module 'test': file 'test.o' not an object file\n",
 				 1);
 
@@ -442,7 +395,7 @@ t_z80asm_capture("-b -d ".o_file(),
 unlink_testfiles();
 write_file(asm_file(), "nop");
 write_file(lib_file(), "not a library");
-t_z80asm_capture("-b -i".lib_file()." ".asm_file(), "",
+t_z80asm_capture("-b -l".lib_file()." ".asm_file(), "",
 		"Error: file 'test.lib' not a library file\n",
 		1);
 
@@ -453,8 +406,8 @@ $lib = libfile(objfile(NAME => "test", CODE => [["", -1, 1, "\x00"]] ));
 substr($lib,6,2)="99";		# change version
 write_file(asm_file(), "nop");
 write_file(lib_file(), $lib);
-t_z80asm_capture("-b -i".lib_file()." ".asm_file(), "", <<"END", 1);
-Error: library file 'test.lib' version 99, expected version 12
+t_z80asm_capture("-b -l".lib_file()." ".asm_file(), "", <<"END", 1);
+Error: library file 'test.lib' version 99, expected version 14
 END
 
 #------------------------------------------------------------------------------
@@ -478,7 +431,7 @@ t_binary(read_binfile("test.bin"), "\xFE\x10");
 #------------------------------------------------------------------------------
 unlink_testfiles();
 
-my $objs = "errors.o error_func.o scan.o lib/array.o lib/class.o lib/str.o lib/strhash.o lib/list.o  ../common/fileutil.o ../common/strutil.o ../common/die.o ../common/objfile.o ../../ext/regex/regcomp.o ../../ext/regex/regerror.o ../../ext/regex/regexec.o ../../ext/regex/regfree.o options.o model.o module.o sym.o symtab.o codearea.o expr.o listfile.o lib/srcfile.o macros.o hist.o lib/dbg.o ";
+my $objs = "errors.o error_func.o scan.o lib/array.o lib/class.o lib/str.o lib/strhash.o lib/list.o  ../common/fileutil.o ../common/strutil.o ../common/die.o ../common/objfile.o ../../ext/regex/regcomp.o ../../ext/regex/regerror.o ../../ext/regex/regexec.o ../../ext/regex/regfree.o options.o model.o module.o sym.o symtab.o codearea.o expr.o listfile.o lib/srcfile.o macros.o hist.o lib/dbg.o ../common/zutils.o modlink.o zobjfile.o libfile.o z80asm.o z80pass.o directives.o parse.o opcodes.o ";
 if ($^O eq 'MSWin32' || $^O eq 'msys') {
 	  $objs .= "../../ext/UNIXem/src/glob.o ../../ext/UNIXem/src/dirent.o ";
 }

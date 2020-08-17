@@ -64,33 +64,33 @@ int residos_exec(char* target)
     package_id = parameter_search(crtfile, ".map", "residos_package_id");
 
     if (table_start == -1) {
-        myexit("Could not find parameter package_call_table (not a Residos package compile?)\n", 1);
+        exit_log(1,"Could not find parameter package_call_table (not a Residos package compile?)\n");
     }
     if (table_end == -1) {
-        myexit("Could not find parameter package_call_end (not a Residos package compile?)\n", 1);
+        exit_log(1,"Could not find parameter package_call_end (not a Residos package compile?)\n");
     }
     if (package_id == -1) {
-        myexit("Could not find parameter residos_package_id (not a Residos package compile?)\n", 1);
+        exit_log(1,"Could not find parameter residos_package_id (not a Residos package compile?)\n");
     }
 
     if ((binfile = fopen_bin(binname, crtfile)) == NULL) {
-        myexit("Can't open binary file\n", 1);
+        exit_log(1,"Can't open binary file\n");
     }
 
     if (fseek(binfile, 0, SEEK_END)) {
         fclose(binfile);
-        myexit("Couldn't determine the size of the file\n", 1);
+        exit_log(1,"Couldn't determine the size of the file\n");
     }
 
     filesize = ftell(binfile);
 
     if (filesize > 0x3fc0) {
         fclose(binfile);
-        myexit("The source binary is over 16,320 bytes in length.\n", 1);
+        exit_log(1,"The source binary is over 16,320 bytes in length.\n");
     }
 
     if ((memory = calloc(16384, 1)) == NULL) {
-        myexit("Can't allocate memory\n", 1);
+        exit_log(1,"Can't allocate memory\n");
     }
 
     /* Basic header size is 16:
@@ -110,7 +110,7 @@ int residos_exec(char* target)
     // Binary blob
     */
 
-    strcpy(memory, "ZXPKG");
+    strcpy((char *)memory, "ZXPKG");
     memory[5] = 0; /* Capabilities */
     memory[6] = package_id;
     memory[7] = 0x23; /* Minimum Residos version is v2.23 */
@@ -127,34 +127,30 @@ int residos_exec(char* target)
 
     if (filesize != readlen) {
         fclose(binfile);
-        myexit("Couldn't read in binary file\n", 1);
+        exit_log(1,"Couldn't read in binary file\n");
     }
 
     fclose(binfile);
 
     save_block(filesize + HEADER_SIZE, outfile, ".com");
 
-    myexit(0, 0);
     return 0;
 }
 
 void save_block(long filesize, char* base, char* ext)
 {
     char name[FILENAME_MAX + 1];
-    char buffer[LINEMAX + 1];
     FILE* fp;
 
     strcpy(name, base);
     suffix_change(name, ext);
 
     if ((fp = fopen(name, "wb")) == NULL) {
-        snprintf(buffer, sizeof(buffer), "Can't open output file %s\n", name);
-        myexit(buffer, 1);
+        exit_log(1,"Can't open output file %s\n", name);
     }
 
     if (fwrite(memory, 1, filesize, fp) != filesize) {
-        snprintf(buffer, sizeof(buffer), "Can't write to output file %s\n", name);
-        myexit(buffer, 1);
+        exit_log(1,"Can't write to output file %s\n", name);
     }
     fclose(fp);
 }

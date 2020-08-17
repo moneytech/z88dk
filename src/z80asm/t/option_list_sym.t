@@ -3,7 +3,7 @@
 # Z88DK Z80 Macro Assembler
 #
 # Copyright (C) Gunther Strube, InterLogic 1993-99
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
 # Repository: https://github.com/z88dk/z88dk/
 #
@@ -46,24 +46,20 @@ ok ! -f "test.lis", "no test.lis";
 check_bin_file("test.bin", $bin);
 
 # -s, no -l
-for my $opt ('-s', '--symtable') {
-	unlink_testfiles();
-	z80asm($asm, "-b $opt");
-	ok   -f "test.sym", "test.sym";
-	ok ! -f "test.lis", "no test.lis";
-	check_bin_file("test.bin", $bin);
-	check_text_file("test.sym", $sym);
-}
+unlink_testfiles();
+z80asm($asm, "-b -s");
+ok   -f "test.sym", "test.sym";
+ok ! -f "test.lis", "no test.lis";
+check_bin_file("test.bin", $bin);
+check_text_file("test.sym", $sym);
 
 # no -s, -l
-for my $opt ('-l', '--list') {
-	unlink_testfiles();
-	z80asm($asm, "-b $opt");
-	ok ! -f "test.sym", "test.sym";
-	ok   -f "test.lis", "no test.lis";
-	check_bin_file("test.bin", $bin);
-	check_text_file("test.lis", $lis);
-}
+unlink_testfiles();
+z80asm($asm, "-b -l");
+ok ! -f "test.sym", "test.sym";
+ok   -f "test.lis", "no test.lis";
+check_bin_file("test.bin", $bin);
+check_text_file("test.lis", $lis);
 
 # -s, -l
 unlink_testfiles();

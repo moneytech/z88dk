@@ -3,9 +3,9 @@
 # Z88DK Z80 Macro Assembler
 #
 # Copyright (C) Gunther Strube, InterLogic 1993-99
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
-# Repository: https://github.com/pauloscustodio/z88dk-z80asm
+# Repository: https://github.com/z88dk/z88dk
 #
 # Test https://github.com/z88dk/z88dk/issues/222
 # z80asm: Can I use the assembler to make a .tap image, like pasmo does?
@@ -94,16 +94,17 @@ my $ramtop_tap =
 
 # no org, not verbose
 unlink_testfiles();
-z80asm($asm, "+zx");
+z80asm($asm, "+zx -m");
 check_bin_file("test.bin", $bin);
 check_bin_file("test.tap", $rem_tap);
 
 
 # no org, verbose
 unlink_testfiles();
-z80asm($asm, "+zx -v", 0, <<'END');
+z80asm($asm, "+zx -m -v", 0, <<'END');
 	Reading library 'z80asm-z80-.lib'
 	Predefined constant: __CPU_Z80__ = $0001
+	Predefined constant: __CPU_ZILOG__ = $0001
 	Assembling 'test.asm' to 'test.o'
 	Reading 'test.asm' = 'test.asm'
 	Writing object file 'test.o'
@@ -119,14 +120,14 @@ check_bin_file("test.tap", $rem_tap);
 
 # ignore ORG statements
 unlink_testfiles();
-z80asm("org 20000\n".$asm, "+zx");
+z80asm("org 20000\n".$asm, "+zx -m");
 check_bin_file("test.bin", $bin);
 check_bin_file("test.tap", $rem_tap);
 
 
 # error for -r below 23760
 unlink_testfiles();
-z80asm($asm, "+zx -r23759", 1, "", <<'END');
+z80asm($asm, "+zx -m -r23759", 1, "", <<'END');
 	Error: invalid origin: 23759
 END
 check_bin_file("test.bin", $bin);
@@ -135,7 +136,7 @@ ok ! -f "test.tap", "no test.tap";
 
 # ignore split sections
 unlink_testfiles();
-z80asm(<<'END', "+zx", 0, "", <<'END');
+z80asm(<<'END', "+zx -m", 0, "", <<'END');
 	section code1
 	org 23760
 	ld bc, 1234
@@ -153,7 +154,7 @@ check_bin_file("test.tap", $rem_tap);
 
 # above ramtop
 unlink_testfiles();
-z80asm($asm, "+zx -r24000");
+z80asm($asm, "+zx -m -r24000");
 check_bin_file("test.bin", $bin);
 check_bin_file("test.tap", $ramtop_tap);
 
@@ -242,6 +243,7 @@ unlink_testfiles();
 z80asm($asm, "+zx81 -v", 0, <<'END', "");
 	Reading library 'z80asm-z80-.lib'
 	Predefined constant: __CPU_Z80__ = $0001
+	Predefined constant: __CPU_ZILOG__ = $0001
 	Assembling 'test.asm' to 'test.o'
 	Reading 'test.asm' = 'test.asm'
 	Writing object file 'test.o'

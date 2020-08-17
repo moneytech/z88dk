@@ -45,7 +45,6 @@ int c7420_exec(char* target)
     unsigned int location;
     unsigned long checksum;
 
-    strcpy(ldr_name, "_");
 
     if ((binname == NULL) && (crtfile == NULL)) {
         return -1;
@@ -59,24 +58,22 @@ int c7420_exec(char* target)
     }
 
     if (strcmp(binname, filename) == 0) {
-        fprintf(stderr, "Input and output file names must be different\n");
-        myexit(NULL, 1);
+        exit_log(1,"Input and output file names must be different\n");
     }
 
     if (blockname == NULL)
-        blockname = binname;
+        blockname = zbasename(binname);
 
     if (origin != -1) {
         pos = origin;
     } else {
         if ((pos = get_org_addr(crtfile)) == -1) {
-            myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+            exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
         }
     }
 
     if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-        printf("Can't open input file %s\n", binname);
-        exit(1);
+        exit_log(1,"Can't open input file %s\n", binname);
     }
 
     /*
@@ -95,10 +92,16 @@ int c7420_exec(char* target)
     fseek(fpin, 0L, SEEK_SET);
 
     if (pos == 35055) {
+        char *copy1, *copy2;
         /****************************/
         /* Single BASIC + M/C block */
         /****************************/
-        strcat(ldr_name, filename);
+
+        copy1 = strdup(filename);
+        copy2 = strdup(filename);
+        snprintf(ldr_name, sizeof(ldr_name), "%s/_%s", zdirname(copy1), zbasename(copy2));
+        free(copy1);
+        free(copy2);
 
         if ((fpout = fopen(ldr_name, "wb")) == NULL) {
             printf("Can't create the loader file\n");
@@ -111,12 +114,9 @@ int c7420_exec(char* target)
         for (i = 1; i <= 10; i++)
             writebyte(0xD3, fpout);
         writebyte(' ', fpout); /* File type ' ', BASIC program. */
-        if (strlen(blockname) >= 6) {
-            strncpy(name, blockname, 6);
-        } else {
-            strcpy(name, blockname);
-            strncat(name, "      ", 6 - strlen(blockname));
-        }
+
+        snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, blockname);
+
         writestring(name, fpout);
         writebyte(0, fpout);
         writebyte('1', fpout); /* Autorun (line 10) */
@@ -170,14 +170,19 @@ int c7420_exec(char* target)
         /* the code tail will append the binary block and update the checksum */
 
     } else {
-
+        char *copy1, *copy2;
         /****************/
         /* BASIC loader */
         /****************/
-        sprintf(lsbbuf, "%i", (int)pos % 256); /* no more than 3 characters long */
-        sprintf(msbbuf, "%i", (int)pos / 256); /* no more than 3 characters long */
+        sprintf(lsbbuf, "%i", (uint8_t) (pos % 256) ); /* no more than 3 characters long */
+        sprintf(msbbuf, "%i", (uint8_t) (pos / 256) ); /* no more than 3 characters long */
 
-        strcat(ldr_name, filename);
+        copy1 = strdup(filename);
+        copy2 = strdup(filename);
+        snprintf(ldr_name, sizeof(ldr_name), "%s/_%s", zdirname(copy1), zbasename(copy2));
+        free(copy1);
+        free(copy2);
+
 
         if ((fpout = fopen(ldr_name, "wb")) == NULL) {
             printf("Can't create the loader file\n");
@@ -276,12 +281,9 @@ int c7420_exec(char* target)
         for (i = 1; i <= 10; i++)
             writebyte(0xD3, fpout);
         writebyte('M', fpout); /* File type 'M' (Memory block) */
-        if (strlen(blockname) >= 6) {
-            strncpy(name, blockname, 6);
-        } else {
-            strcpy(name, blockname);
-            strncat(name, "      ", 6 - strlen(blockname));
-        }
+
+        snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, blockname);
+
         writestring(name, fpout);
         writebyte(0, fpout);
         writebyte(0, fpout);

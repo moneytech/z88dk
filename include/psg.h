@@ -60,6 +60,11 @@
 #define psgT(hz)		((int)(223722 / (hz)))
 #endif
 
+#ifdef __COLECO__
+// 3579545
+#define psgT(hz)		((int)(223722 / (hz)))
+#endif
+
 
 // **************
 //     YM PSG
@@ -153,6 +158,10 @@
 #ifndef psgT
 #define psgT(hz)		((int)(62500.0 / (hz)))
 #endif
+#endif
+
+#ifdef __VECTOR06C__
+#define psgT(hz)		((int)(110837.5 / (hz)))
 #endif
 
 #ifdef __ZX80__

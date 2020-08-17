@@ -6,7 +6,7 @@
  *                         - Modified for the Jupiter ACE
  *	Stefano 19/5/2010 - Heavily updated
  *
- *	$Id: ace-tap.c,v 1.15 2016-06-26 00:46:54 aralbrec Exp $
+ *	$Id: ace-tap.c $
  */
 
 #include "appmake.h"
@@ -19,6 +19,7 @@ static int               origin       = -1;
 static char              help         = 0;
 static char              audio        = 0;
 static char              fast         = 0;
+static char              khz_22       = 0;
 static char              dumb         = 0;
 static char              noloader     = 0;
 static unsigned char     parity;
@@ -32,6 +33,7 @@ option_t acetap_options[] = {
     { 'o', "output",   "Name of output file",        OPT_STR,   &outfile },
     {  0,  "audio",    "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",     "Create a fast loading WAV",  OPT_BOOL,  &fast },
+    {  0,  "22",       "22050hz bitrate option",     OPT_BOOL,  &khz_22 },
     {  0,  "dumb",     "Just convert to WAV a tape file",  OPT_BOOL,  &dumb },
     {  0,  "noloader",  "Don't create the loader block",  OPT_BOOL,  &noloader },
     {  0 , "org",      "Origin of the binary",       OPT_INT,   &origin },
@@ -75,19 +77,18 @@ int acetap_exec(char* target)
         }
 
         if (blockname == NULL)
-            blockname = binname;
+            blockname = zbasename(binname);
 
         if (origin != -1) {
             pos = origin;
         } else {
             if ((pos = get_org_addr(crtfile)) == -1) {
-                myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+                exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
             }
         }
 
         if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-            fprintf(stderr, "Can't open input file %s\n", binname);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open input file %s\n", binname);
         }
 
         /*
@@ -95,9 +96,8 @@ int acetap_exec(char* target)
 	 *        to be converted
 	 */
         if (fseek(fpin, 0, SEEK_END)) {
-            fprintf(stderr, "Couldn't determine size of file\n");
             fclose(fpin);
-            myexit(NULL, 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
 
         len = ftell(fpin);
@@ -106,7 +106,7 @@ int acetap_exec(char* target)
 
         if ((fpout = fopen(filename, "wb")) == NULL) {
             fclose(fpin);
-            myexit("Can't open output file\n", 1);
+            exit_log(1,"Can't open output file <%s>\n", filename);
         }
 
         /* ===============
@@ -122,12 +122,8 @@ int acetap_exec(char* target)
             writebyte_p(32, fpout, &parity); /* ACE header block type */
 
             /* deal with the filename */
-            if (strlen(blockname) >= 10) {
-                strncpy(name, blockname, 10);
-            } else {
-                strcpy(name, blockname);
-                strncat(name, "          ", 10 - strlen(blockname));
-            }
+            snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, blockname);
+
             blockname = codename; /* Next block will be named z88dk_code */
             for (i = 0; i <= 9; i++)
                 writebyte_p(name[i], fpout, &parity);
@@ -160,12 +156,8 @@ int acetap_exec(char* target)
         writebyte_p(32, fpout, &parity); /* ACE header block type */
 
         /* Deal with the filename */
-        if (strlen(blockname) >= 10) {
-            strncpy(name, blockname, 10);
-        } else {
-            strcpy(name, blockname);
-            strncat(name, "          ", 10 - strlen(blockname));
-        }
+        snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, blockname);
+
         for (i = 0; i <= 9; i++)
             writebyte_p(name[i], fpout, &parity);
         writeword_p(len, fpout, &parity);
@@ -189,15 +181,14 @@ int acetap_exec(char* target)
     /* ***************************************** */
     /*  Now, if requested, create the audio file */
     /* ***************************************** */
-    if (audio) {
+    if ((audio) || (fast) || (khz_22)) {
         if ((fpin = fopen(filename, "rb")) == NULL) {
-            fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open file %s for wave conversion\n", filename);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file <%s>\n",filename);
         }
         len = ftell(fpin);
         fseek(fpin, 0L, SEEK_SET);
@@ -205,8 +196,7 @@ int acetap_exec(char* target)
         strcpy(wavfile, filename);
         suffix_change(wavfile, ".RAW");
         if ((fpout = fopen(wavfile, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output raw audio file %s\n", wavfile);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open output raw audio file <%s>\n", wavfile);
         }
 
         /* leading silence */
@@ -246,7 +236,11 @@ int acetap_exec(char* target)
         fclose(fpout);
 
         /* Now let's think at the WAV format */
-        raw2wav(wavfile);
+        /* Now let's think at the WAV format */
+		if (khz_22)
+			raw2wav_22k(wavfile,2);
+		else
+			raw2wav(wavfile);
     }
 
     return 0;

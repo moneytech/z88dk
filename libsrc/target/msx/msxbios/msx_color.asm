@@ -6,13 +6,14 @@
 ;
 ;	Change the MSX color attributes
 ;
-;	$Id: msx_color.asm,v 1.6 2016-06-16 19:30:25 dom Exp $
+;	$Id: msx_color.asm $
 ;
 
         SECTION code_clib
 	PUBLIC	msx_color
 	PUBLIC	_msx_color
 	EXTERN	msxbios
+	EXTERN	__tms9918_attribute
 	
 IF FORmsx
         INCLUDE "target/msx/def/msxbios.def"
@@ -30,10 +31,20 @@ _msx_color:
 	add	ix,sp
 	ld	a,(ix+2)	;border
 	ld	(BDRCLR),a
-	ld	a,(ix+4)	;background
-	ld	(BAKCLR),a
 	ld	a,(ix+6)	;foreground
+	and	$0f
 	ld	(FORCLR),a
+	rlca
+	rlca
+	rlca
+	rlca
+	and	$f0
+	ld	l,a
+	ld	a,(ix+4)	;background
+	and	$0f
+	ld	(BAKCLR),a
+	or	l
+	ld	(__tms9918_attribute),a
 	ld	a,(0FCAFh)	;SCRMOD
 	ld	ix,CHGCLR
 	call	msxbios

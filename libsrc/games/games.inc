@@ -5,7 +5,7 @@
 ;       based on the Dominic's sound routines
 ;
 ;
-;       $Id: games.inc,v 1.31 2016-11-15 11:42:34 stefano Exp $
+;       $Id: games.inc $
 ;
 
 IF FORc128
@@ -15,6 +15,18 @@ IF FORc128
 ENDIF
 
 IF FORzx
+        defc sndbit_port   = 254
+        defc sndbit_bit    = 4
+        defc sndbit_mask   = 16         ; (2^sndbit_bit)
+ENDIF
+
+IF FORzxn
+        defc sndbit_port   = 254
+        defc sndbit_bit    = 4
+        defc sndbit_mask   = 16         ; (2^sndbit_bit)
+ENDIF
+
+IF FORts2068
         defc sndbit_port   = 254
         defc sndbit_bit    = 4
         defc sndbit_mask   = 16         ; (2^sndbit_bit)
@@ -75,6 +87,12 @@ IF FORenterprise
         defc sndbit_port   = $A8
         defc sndbit_bit    = 5
         defc sndbit_mask   = 32
+ENDIF
+
+IF FORg800
+        defc sndbit_port   = $18
+        defc sndbit_bit    = 7
+        defc sndbit_mask   = 192
 ENDIF
 
 IF FORp2000
@@ -215,6 +233,12 @@ IF FORsv8000
         defc sndbit_mask   = 0
 ENDIF
 
+IF FORgb
+        defc sndbit_port   = 0
+        defc sndbit_bit    = 0
+        defc sndbit_mask   = 0
+ENDIF
+
 IF FOReinstein
         defc sndbit_port   = 0
         defc sndbit_bit    = 0
@@ -271,12 +295,66 @@ IF FORpc6001
         defc sndbit_mask   = 0
 ENDIF
 
+IF FORtvc
+        defc sndbit_port   = 0
+        defc sndbit_bit    = 0
+        defc sndbit_mask   = 0
+ENDIF
+
+IF FORpmd85
+        defc sndbit_port   = 0
+        defc sndbit_bit    = 0
+        defc sndbit_mask   = 0
+ENDIF
+
+IF FORvector06c
+        defc sndbit_port   = 0
+        defc sndbit_bit    = 0
+        defc sndbit_mask   = 0
+ENDIF
+  
+IF FORm100
+        defc sndbit_port   = 0
+        defc sndbit_bit    = 0
+        defc sndbit_mask   = 0
+ENDIF
+
 IF FORsmc777
-    defc sndbit_port	= $1d
+    defc sndbit_port	= $1c
     defc sndbit_bit    = 4
     defc sndbit_mask   = $15
 ENDIF
 
+IF FORmyvision
+    defc sndbit_port	= 0
+    defc sndbit_bit    = 0
+    defc sndbit_mask   = 0
+ENDIF
+
+IF FORhomelab
+    defc sndbit_port	= 0
+    defc sndbit_bit    = 0
+    defc sndbit_mask   = 0
+ENDIF
+
+IF FORhomelab2
+    defc sndbit_port	= 0
+    defc sndbit_bit    = 0
+    defc sndbit_mask   = 0
+ENDIF
+
+IF FORprimo
+    defc sndbit_port	= $00 ;
+    defc sndbit_bit    = 4
+    defc sndbit_mask   = $10		;
+ENDIF
+
+IF FORmikro80
+    defc sndbit_port	= $4 ;
+    defc sndbit_bit    = 1
+    defc sndbit_mask   = $2	;
+
+ENDIF
 
 ; ********************************************************
 ;  SN76489 PSG chip definitions
@@ -331,10 +409,24 @@ ENDIF
 
 
 IF FORcoleco
-    defc sndbit_port	= $E0		; also valid for Coleco Adam and Pencil II
+    defc sndbit_port	= $ff		; also valid for Coleco Adam and Pencil II
     defc sndbit_bit    = 3
     defc sndbit_mask   = $0F			; $0F for full volume output
 ENDIF
+
+IF FORbit90
+    defc sndbit_port	= $ff		; also valid for Coleco Adam and Pencil II
+    defc sndbit_bit    = 3
+    defc sndbit_mask   = $0F			; $0F for full volume output
+ENDIF
+
+IF FORpencil2
+    defc sndbit_port	= $ff		; also valid for Coleco Adam and Pencil II
+    defc sndbit_bit    = 3
+    defc sndbit_mask   = $0F			; $0F for full volume output
+ENDIF
+
+
 
 
 ; ********************************************************

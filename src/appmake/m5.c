@@ -1,7 +1,7 @@
 /*
  *        Sord M5 CAS and WAV generator/converter
  *
- *        $Id: m5.c,v 1.6 2016-06-26 00:46:55 aralbrec Exp $
+ *        $Id: m5.c $
  */
 
 #include "appmake.h"
@@ -15,6 +15,7 @@ static int               origin       = -1;
 static char              help         = 0;
 static char              audio        = 0;
 static char              fast         = 0;
+static char              khz_22       = 0;
 unsigned long            checksum;
 
 
@@ -26,6 +27,7 @@ option_t m5_options[] = {
     { 'o', "output",   "Name of output file",        OPT_STR,   &outfile },
     {  0,  "audio",    "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",     "Create a fast loading WAV",  OPT_BOOL,  &fast },
+    {  0,  "22",       "22050hz bitrate option",     OPT_BOOL,  &khz_22 },
     {  0 , "org",      "Origin of the binary",       OPT_INT,   &origin },
     {  0 , "blockname", "Name of the code block in tap file", OPT_STR, &blockname},
     {  0 ,  NULL,       NULL,                        OPT_NONE,  NULL }
@@ -99,19 +101,18 @@ int m5_exec(char* target)
     }
 
     if (blockname == NULL)
-        blockname = binname;
+        blockname = zbasename(binname);
 
     if (origin != -1) {
         pos = origin;
     } else {
         if ((pos = get_org_addr(crtfile)) == -1) {
-            myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+            exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
         }
     }
 
     if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-        fprintf(stderr, "Can't open input file %s\n", binname);
-        myexit(NULL, 1);
+        exit_log(1, "Can't open input file %s\n", binname);
     }
 
     /*
@@ -119,9 +120,8 @@ int m5_exec(char* target)
  *        to be converted
  */
     if (fseek(fpin, 0, SEEK_END)) {
-        fprintf(stderr, "Couldn't determine size of file\n");
         fclose(fpin);
-        myexit(NULL, 1);
+        exit_log(1,  "Couldn't determine size of file\n");
     }
 
     len = ftell(fpin);
@@ -130,7 +130,7 @@ int m5_exec(char* target)
 
     if ((fpout = fopen(filename, "wb")) == NULL) {
         fclose(fpin);
-        myexit("Can't open output file\n", 1);
+        exit_log(1,"Can't open output file\n");
     }
 
     /* ===============
@@ -196,16 +196,14 @@ int m5_exec(char* target)
     /* ***************************************** */
     /*  Now, if requested, create the audio file */
     /* ***************************************** */
-    if (audio) {
+    if ((audio) || (fast) || (khz_22)) {
         if ((fpin = fopen(filename, "rb")) == NULL) {
-            fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open file %s for wave conversion\n", filename);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
-            fprintf(stderr, "Couldn't determine size of file\n");
             fclose(fpin);
-            myexit(NULL, 1);
+            exit_log(1,  "Couldn't determine size of file\n");
         }
         len = ftell(fpin) - 16 - 32;
         fseek(fpin, 16L, SEEK_SET);
@@ -213,8 +211,7 @@ int m5_exec(char* target)
         strcpy(wavfile, filename);
         suffix_change(wavfile, ".RAW");
         if ((fpout = fopen(wavfile, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output raw audio file %s\n", wavfile);
-            myexit(NULL, 1);
+            exit_log(1,  "Can't open output raw audio file %s\n", wavfile);
         }
 
         /* leading silence */
@@ -265,7 +262,10 @@ int m5_exec(char* target)
         fclose(fpout);
 
         /* Now let's think at the WAV format */
-        raw2wav(wavfile);
+		if (khz_22)
+			raw2wav_22k(wavfile,2);
+		else
+			raw2wav(wavfile);
     }
 
     return 0;

@@ -2721,10 +2721,10 @@ static void get_fileinfo (
 
 #else	/* Non-LFN configuration */
 	si = di = 0;
-	while (si < 11) {		/* Copy name body and extension */
+	while (si < 11) {		                /* Copy name body and extension */
 		c = (TCHAR)dp->dir[si++];
-		if (c == ' ') continue;		/* Skip padding spaces */
-		if (c == RDDEM) c = DDEM;	/* Restore replaced DDEM character */
+		if (c == ' ') continue;		        /* Skip padding spaces */
+		if (c == RDDEM) c = (TCHAR) DDEM;	/* Restore replaced DDEM character */
 		if (si == 9) fno->fname[di++] = '.';/* Insert a . if extension is exist */
 		fno->fname[di++] = c;
 	}
@@ -5918,7 +5918,7 @@ FRESULT f_mkfs (
 				st_dword(buf + 4, 0xFFFFFFFF);	/* Entry 1 */
 				st_dword(buf + 8, 0x0FFFFFFF);	/* Entry 2 (root directory) */
 			} else {
-				st_dword(buf + 0, (fmt == FS_FAT12) ? 0xFFFFF8 : 0xFFFFFFF8);	/* Entry 0 and 1 */
+				st_dword(buf + 0, (fmt == FS_FAT12) ? 0xFFFFF9 : 0xFFFFFFF8);	/* Entry 0 and 1 */
 			}
 			nsect = sz_fat;		/* Number of FAT sectors */
 			do {	/* Fill FAT sectors */

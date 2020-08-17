@@ -5,7 +5,7 @@
 
 
 /* Temporary fix to turn off features not supported by sdcc */
-#ifdef __SDCC
+#if __SDCC | __clang__
 #define __LIB__
 #define __SAVEFRAME__
 #define far
@@ -14,10 +14,30 @@
 #define __stdc
 #define __z88dk_deprecated
 #define __z88dk_sdccdecl
+
+// Make intellisense run easier..
+#ifdef __clang__
+#define __smallc 
+#define __z88dk_callee
+#define __z88dk_fastcall
+#endif
+
 #else
 #define __vasmallc __smallc
 #define __z88dk_deprecated
 #endif
+
+#ifdef __8080__
+#define __DISABLE_BUILTIN 
+#endif
+
+#if __SDCC && __GBZ80__
+#define __DISABLE_BUILTIN 
+#define __z88dk_fastcall
+#endif
+
+#define NONBANKED __nonbanked
+#define BANKED __banked
 
 #define __CHAR_LF '\n'
 #define __CHAR_CR '\r'

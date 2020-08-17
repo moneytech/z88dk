@@ -18,9 +18,9 @@
  *
  */
 
-/* save the sprite background in another sprite (not yet working with coordinates > 255) */
-extern void __LIB__ bksave(int x, int y, void *sprite) __smallc;
-extern void __LIB__  bkrestore(void *sprite) __z88dk_fastcall;
+/* save the sprite background in another sprite (the 'background' struct and its size is target dependent) */
+extern void __LIB__ bksave(int x, int y, void *background) __smallc;
+extern void __LIB__  bkrestore(void *background) __z88dk_fastcall;
 
 /* pick up a sprite directly from the screen  (not yet working with coordinates > 255) */
 extern void __LIB__ getsprite(int x, int y, void *sprite) __smallc;
@@ -82,11 +82,26 @@ extern const unsigned char *joystick_type[];
 	#define GAME_DEVICES 3
 #endif
 
+#ifdef __TVC__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = { "Joystick 1/internal", "Joystick 2"};
+#endif
+	#define GAME_DEVICES 2
+#endif
+
+
 #ifdef __GAL__
 #ifdef DEFINE_JOYSTICK_TYPE
 	const unsigned char *joystick_type[] = {"Arrows and SPACE", "5678-0"};
 #endif
 	#define GAME_DEVICES 2
+#endif
+
+#ifdef __GAMEBOY__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"Joypad"};
+#endif
+	#define GAME_DEVICES 1
 #endif
 
 #ifdef __PC6001__
@@ -124,11 +139,41 @@ extern const unsigned char *joystick_type[];
 	#define GAME_DEVICES 3
 #endif
 
+#ifdef __PENCIL2__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"QAOP-MN", "8246-05", "hjkl-sd", "Cursor"};
+#endif
+	#define GAME_DEVICES 4
+#endif
+
 #ifdef __COLECO__
+#ifndef __BIT90__
 #ifdef DEFINE_JOYSTICK_TYPE
 	const unsigned char *joystick_type[] = {"Joystick 1", "Joystick 2", "Joystick 2 + Keypad 1", "Joystick 2 + Keypad 2"};
 #endif
 	#define GAME_DEVICES 4
+#endif
+#endif
+
+#ifdef __BIT90__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = { "QAOP-MN", "8246-05", "hjkl-sd", "Cursor", "Joystick 1", "Joystick 2", "Joystick 2 + Keypad 1", "Joystick 2 + Keypad 2"};
+#endif
+	#define GAME_DEVICES 8
+#endif
+
+#ifdef __HOMELAB__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"QAOP-MN", "8246-05", "hjkl-sd", "Cursor"};
+#endif
+	#define GAME_DEVICES 4
+#endif
+
+#ifdef __HOMELAB2__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"QAOP-MN", "8246-05", "hjkl-sd"};
+#endif
+	#define GAME_DEVICES 3
 #endif
 
 #ifdef __LASER500__
@@ -141,6 +186,13 @@ extern const unsigned char *joystick_type[];
 #ifdef __MC1000__
 #ifdef DEFINE_JOYSTICK_TYPE
 	const unsigned char *joystick_type[] = {"Joystick A", "Joystick B"};
+#endif
+	#define GAME_DEVICES 2
+#endif
+
+#ifdef __MYVISION__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"Cursor","1234-56"};
 #endif
 	#define GAME_DEVICES 2
 #endif
@@ -196,9 +248,9 @@ extern const unsigned char *joystick_type[];
 
 #ifdef __SPECTRUM__
 #ifdef DEFINE_JOYSTICK_TYPE
-	const unsigned char *joystick_type[] = {"Kempston","Sinclair 1","Sinclair 2","Cursor","Fuller"};
+	const unsigned char *joystick_type[] = {"Kempston","Sinclair 1","Sinclair 2","Cursor","Fuller","QAOP-MN"};
 #endif
-	#define GAME_DEVICES 5
+	#define GAME_DEVICES 6
 #endif
 
 #ifdef __PASOPIA7__
@@ -236,6 +288,28 @@ extern const unsigned char *joystick_type[];
 #endif
 	#define GAME_DEVICES 2
 #endif
+
+#ifdef __PMD85__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"QAOP-MN", "8246-05", "hjkl-sd"};
+#endif
+	#define GAME_DEVICES 3
+#endif
+
+#ifdef __PRIMO__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"QAOP-MN", "8246-05", "hjkl-sd", "Cursor"};
+#endif
+	#define GAME_DEVICES 4
+#endif
+
+#ifdef __MIKRO80__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"QAOP-MN", "8246-05", "hjkl-sd", "Cursor"};
+#endif
+	#define GAME_DEVICES 4
+#endif
+
 
 #ifdef __SORCERER__
 #ifdef DEFINE_JOYSTICK_TYPE
@@ -300,6 +374,14 @@ extern const unsigned char *joystick_type[];
 	#define GAME_DEVICES 1
 #endif
 
+#ifdef __VECTOR06C__
+#ifdef DEFINE_JOYSTICK_TYPE
+	const unsigned char *joystick_type[] = {"QAOP-MN", "8246-05", "hjkl-sd", "Cursor"};
+#endif
+	#define GAME_DEVICES 4
+#endif
+
+
 #ifdef __VG5000__
 #ifdef DEFINE_JOYSTICK_TYPE
 	const unsigned char *joystick_type[] = {"Joystick 1", "Joystick 2","AQOP-MN", "8246-05", "hjkl-sd", "Cursor"};
@@ -343,6 +425,8 @@ extern const unsigned char *joystick_type[];
 #endif
 	#define GAME_DEVICES 2
 #endif
+
+
 
 
 #endif

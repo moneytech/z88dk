@@ -41,10 +41,20 @@ loop:
 	or	e
 	ld	d,a
 continue:
+IF __CPU_INTEL__
+	ld	a,e
+	and	a
+	rla
+	ld	e,a
+ELSE
 	sla	e	;Shift mask across
+ENDIF
 	pop	hl
 	pop	bc
 	djnz	loop
+	ld	l,d
+	ld	h,0
+	ret
 finished:
 	pop	bc
 	ld	l,d

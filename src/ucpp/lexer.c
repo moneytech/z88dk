@@ -30,6 +30,7 @@
 #include "tune.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stddef.h>
 #include <limits.h>
 #include "ucppi.h"
@@ -501,6 +502,11 @@ static inline int read_char(struct lexer_state *ls)
 			ls->ebuf = fread(ls->input_buf, 1,
 				INPUT_BUF_MEMG, ls->input);
 			ls->pbuf = 0;
+                        // If we read a chunk and it's the last block and 
+                        // it doesn't end with \n, then stuff one in
+		        if ( feof(ls->input) && ls->ebuf && ls->input_buf[ls->ebuf-1] != '\n' ) {
+			    ls->input_buf[ls->ebuf++] = '\n';
+                        }
 		}
 		if (ls->ebuf == 0) return -1;
 		c = ls->input_buf[ls->pbuf ++];
@@ -796,7 +802,8 @@ static inline int read_token(struct lexer_state *ls)
 	size_t ltok = 0;
 	int c, outc = 0, ucn_in_id = 0;
 	int shift_state;
-	unsigned long utf8;
+	unsigned long utf8 = 0;                         // Prevent uninitialized use warning
+
 	long l = ls->line;
 
 	ls->ctok->line = l;

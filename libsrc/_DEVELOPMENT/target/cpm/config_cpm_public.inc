@@ -21,7 +21,7 @@ PUBLIC __Z88DK
 
 
 
-defc __Z88DK = 1992
+defc __Z88DK = 2000
 
 
 
@@ -759,6 +759,23 @@ defc IOCTL_OCHAR_CRLF = 0xc014
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 PUBLIC __CPM_RCON
 PUBLIC __CPM_WCON
 PUBLIC __CPM_RRDR
@@ -825,9 +842,6 @@ defc __CPM_RRAN = 33
 defc __CPM_WRAN = 34
 defc __CPM_CFS  = 35
 defc __CPM_DSEG = 51
-
-
-
 
 
 

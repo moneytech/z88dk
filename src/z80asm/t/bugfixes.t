@@ -3,7 +3,7 @@
 #-----------------------------------------------------------------------------
 # Z88DK Z80 Macro Assembler
 #
-# Copyright (C) Paulo Custodio, 2011-2018
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: http://www.perlfoundation.org/artistic_license_2_0
 #
 # Test bugfixes
@@ -60,7 +60,7 @@ z80asm(
 				EXTERN one
 				jp one			;; C3 03 00 3E 01 C9
 ASM
-	options => "-itest.lib -b",
+	options => "-ltest.lib -b",
 );
 unlink_temp("test.lib");
 
@@ -192,7 +192,7 @@ for my $lib (      'test',    'test.lib',
     ok -f 'test.lib', "test.lib exists, built $lib";
 	z80asm(
 		asm		=> "EXTERN main \n jp main ;; C3 03 00 C9",
-		options	=> "-b -i".$lib,
+		options	=> "-b -l".$lib,
 	);
 }
 
@@ -248,7 +248,7 @@ ASM1
 							; 8033 ;; C3 2C 80
 							; 8036
 ASM2
-	options	=> "-itest.lib -b -r0x8000",
+	options	=> "-ltest.lib -b -r0x8000",
 );
 
 #------------------------------------------------------------------------------
@@ -476,7 +476,7 @@ z80asm(
 	entry:
 		ret							; 000D ;; C9
 		
-		DEFC L_DIVENTRY = # entry - l_div_u
+		DEFC L_DIVENTRY = entry - l_div_u
 ...
 );
 

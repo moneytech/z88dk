@@ -6,11 +6,11 @@
 ;
 
 	MODULE	code_clib
-	PUBLIC	conio_map_colour
+	PUBLIC	__tms9918_map_colour
 
 	EXTERN	__CLIB_CONIO_NATIVE_COLOUR
 
-conio_map_colour:
+__tms9918_map_colour:
         ld      c,__CLIB_CONIO_NATIVE_COLOUR
         rr      c
         ret     c
@@ -29,9 +29,9 @@ table:
 	defb	$4	;BLUE -> DARK BLUE
 	defb	$c	;GREEN -> MEDIUM GREEN
 	defb	$7	;CYAN -> CYAN
-	defb	$6	;RED -> DARK RED
+	defb	$8	;RED -> MEDIUM RED
 	defb	$d	;MAGENTA -> MAGENTA
-	defb	$8	;BROWN -> MEDIUM RED
+	defb	$6	;BROWN -> DARK RED
 	defb	$b	;LIGHTGRAY -> LIGHT YELLOW
 	defb	$e	;DARKGRAY -> GRAY
 	defb	$5	;LIGHTBLUE -> LIGHT BLUE

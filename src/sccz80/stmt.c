@@ -59,7 +59,8 @@ int statement()
     blanks();
     if (lineno != lastline) {
         lastline = lineno;
-        EmitLine(lineno);
+        if (c_cline_directive || c_intermix_ccode) 
+            gen_emit_line(lineno);
     }
     if (ch() == 0 && eof) {
         return (lastst = STEXP);
@@ -81,7 +82,7 @@ int statement()
         }        
         /* not a definition */
         if (declared >= 0) {
-            Zsp = modstk(Zsp - declared, NO, NO);
+            Zsp = modstk(Zsp - declared, KIND_NONE, NO, YES);
             declared = 0;
         }
         st = -1;
@@ -235,7 +236,7 @@ void compound()
         statement(); /* do one */
     --ncmp; /* close current level */
     if (lastst != STRETURN) {
-        modstk(stkstor[ncmp], NO, NO); /* delete local variable space */
+        modstk(stkstor[ncmp], KIND_NONE, NO, YES); /* delete local variable space */
     }
     Zsp = stkstor[ncmp];
     locptr = savloc; /* delete local symbols */
@@ -266,7 +267,7 @@ void doiferror()
     flab2 = getlabel();
     if (lastst != STRETURN) {
         /* if last statement of 'if' was 'return' we needn't skip 'else' code */
-        jump(flab2);
+        gen_jp_label(flab2);
     }
     postlabel(flab1); /* print false label */
     statement(); /* and do 'else' clause */
@@ -317,7 +318,7 @@ void doif()
     flab2 = getlabel();
     if (lastst != STRETURN) {
         /* if last statement of 'if' was 'return' we needn't skip 'else' code */
-        jump(flab2);
+        gen_jp_label(flab2);
     }
     if ( testtype != 0 ) {
         postlabel(flab1); /* print false label */
@@ -334,14 +335,13 @@ void doif()
 Type *doexpr()
 {
     char *before, *start;
-    double val;
+    zdouble val;
     int    vconst;
-    Kind    type;
     Type   *type_ptr;
-    
+
     while (1) {
         setstage(&before, &start);
-        type = expression(&vconst, &val, &type_ptr);
+        expression(&vconst, &val, &type_ptr);
         clearstage(before, start);
         if (ch() != ',')
             return type_ptr;
@@ -370,7 +370,7 @@ void dowhile()
         clearbuffer(buf);
     } else {
         statement(); /* if so, do a statement */
-        jump(wq.loop); /* loop to label */
+        gen_jp_label(wq.loop); /* loop to label */
         postlabel(wq.exit); /* exit label */
         clearbuffer(buf);
     }
@@ -395,7 +395,7 @@ void dodo()
     if ( testresult == 0 ) { // False
         // We don't need to do anything
     } else {
-        jump(top);
+        gen_jp_label(top);
         postlabel(wq.exit);
     }
     delwhile();
@@ -445,13 +445,13 @@ void dofor()
     suspendbuffer();
 
     if ( testresult != 0 ) {  /* So it's either true or non-constant */
-        jump(l_condition); /*         goto condition             */
+        gen_jp_label(l_condition); /*         goto condition             */
         postlabel(wq.loop); /* .loop                              */
         clearbuffer(buf3); /*         modification               */
         postlabel(l_condition); /* .condition                         */
         clearbuffer(buf2); /*         if (!condition) goto exit  */
         statement(); /*         statement                  */
-        jump(wq.loop); /*         goto loop                  */
+        gen_jp_label(wq.loop); /*         goto loop                  */
         postlabel(wq.exit); /* .exit                              */
     } else {
         clearbuffer(buf2); // Condition 
@@ -460,7 +460,7 @@ void dofor()
         discardbuffer(buf4);
     }
     --ncmp;
-    modstk(savedsp, NO, NO);
+    modstk(savedsp, KIND_NONE, NO, YES);
     Zsp = savedsp;
     locptr = savedloc;
     declared = 0;
@@ -489,43 +489,24 @@ void doswitch()
     swdefault = 0;
     swactive = 1;
     endlab = getlabel();
-    /* jump(endlab) ; */
+    /* gen_jp_label(endlab) ; */
 
     buf = startbuffer(100);
     statement(); /* cases, etc. */
-    /* jump(wq.exit) ; */
+    /* gen_jp_label(wq.exit) ; */
     suspendbuffer();
 
     postlabel(endlab);
-    if (switch_type->kind == KIND_CHAR) {
-        LoadAccum();
-        while (swptr < swnext) {
-            CpCharVal(swptr->value);
-            opjump("z,", swptr->label);
-            ++swptr;
-        }
-    } else {
-        sw(switch_type->kind); /* insert code to match cases */
-        while (swptr < swnext) {
-            defword();
-            printlabel(swptr->label); /* case label */
-            if (switch_type->kind == KIND_LONG) {
-                outbyte('\n');
-                deflong();
-            } else
-                outbyte(',');
-            outdec(swptr->value); /* case value */
-            nl();
-            ++swptr;
-        }
-        defword();
-        outdec(0);
-        nl();
+    gen_switch_preamble(switch_type->kind);
+    while (swptr < swnext ) {
+        gen_switch_case(switch_type->kind, swptr->value, swptr->label);
+        ++swptr;
     }
+    gen_switch_postamble(switch_type->kind);
     if (swdefault)
-        jump(swdefault);
+        gen_jp_label(swdefault);
     else
-        jump(wq.exit);
+        gen_jp_label(wq.exit);
 
     clearbuffer(buf);
 
@@ -551,7 +532,7 @@ void docase()
     }
     postlabel(swnext->label = getlabel());
     constexpr(&value,&valtype, 1);
-    if ( valtype == KIND_DOUBLE ) 
+    if ( kind_is_floating(valtype)) 
         warningfmt("invalid-value","Unexpected floating point encountered, taking int value");
     swnext->value = value;
     needchar(':');
@@ -576,89 +557,38 @@ void doreturn(char type)
 {
     /* if not end of statement, get an expression */
     if (endst() == 0) {
-        Type *expr = doexpr();
-        force(currfn->ctype->return_type->kind, expr->kind, currfn->ctype->return_type->isunsigned, expr->isunsigned, 0);
-        leave(currfn->ctype->return_type->kind, type, incritical);
+        char *before, *start;
+        zdouble val;
+        int    vconst;
+        Type   *type_ptr;
+
+        while (1) {
+            setstage(&before, &start);
+            expression(&vconst, &val, &type_ptr);
+            // If it's a constant and last, clear the load and load as a constant of the right
+            // type
+            if ( vconst && ch() != ',') {
+                LVALUE lval = {0};
+                clearstage(before, NULL);
+                lval.val_type = currfn->ctype->return_type->kind;
+                lval.const_val = val;
+                load_constant(&lval);
+                gen_leave_function(currfn->ctype->return_type->kind, type, incritical);
+                return;
+            }
+            clearstage(before, start);
+            if (ch() != ',')
+                break;
+            inbyte();
+        }
+        force(currfn->ctype->return_type->kind, type_ptr->kind, currfn->ctype->return_type->isunsigned, type_ptr->isunsigned, 0);
+        gen_leave_function(currfn->ctype->return_type->kind, type, incritical);
     } else {
-        leave(KIND_INT, type, incritical);
+        gen_leave_function(KIND_INT, type, incritical);
     }
 }
 
-/*
- * \brief Generate the leave state for a function
- *
- * \param vartype The type of variable we're leaving with
- * \param type 1=c, 2=nc, 0=no carry state
- * \param incritical - We're in a critical section, restore interrupts 
- *
- * \todo Move this to codegen, it's platform specific
- */
-void leave(int vartype, char type, int incritical)
-{
-    int savesp;
-    int save = vartype;
-    int callee_cleanup = (currfn->ctype->flags & CALLEE) && (stackargs > 2);
-    int hlsaved;
 
-    if ( (currfn->flags & NAKED) == NAKED ) {
-        return;
-    }
-
-    if (vartype == KIND_CPTR) /* they are the same in any case! */
-        vartype = KIND_LONG;
-    else if ( vartype == KIND_DOUBLE ) {
-        vartype = KIND_NONE;
-        save = NO;
-    }
-
-    if ( c_notaltreg && abs(Zsp) >= 12 ) {
-        hlsaved = YES;
-        savehl();
-        save=NO;
-    }
-    modstk(0, save, NO);
-    if ( c_notaltreg && abs(Zsp) >= 12 && callee_cleanup == 0 ) {
-        restorehl();
-    }
-
-    if (callee_cleanup) {
-        int save = vartype;
-        if ( vartype != KIND_NONE ) {
-            save = NO;
-            if ( c_notaltreg ) {
-                if ( vartype == KIND_LONG )
-                    savede();
-                if ( hlsaved == NO ) savehl();
-            } else {
-                doexx();
-            }
-        }
-        savesp = Zsp;
-        zpop(); /* Return address in de */
-        Zsp = -(stackargs - 2);
-        modstk(0, save, NO);
-        zpushde(); /* return address back on stack */
-        Zsp = savesp;
-        if ( vartype ) {
-            if ( c_notaltreg ) {
-                if ( vartype == KIND_LONG )
-                    restorede();
-                restorehl();
-            } else {
-                doexx();
-            }
-        }
-    }
-    popframe(); /* Restore previous frame pointer */
-
-    /* Naked has already returned */
-    if ( (currfn->flags & CRITICAL) == CRITICAL || incritical) {
-        zleavecritical();
-    }
-    if (type)
-        setcond(type);
-    zret(); /* and exit function */
-}
 
 /*
  *      "break" statement
@@ -670,8 +600,8 @@ void dobreak()
     /* see if any "whiles" are open */
     if ((ptr = readwhile(wqptr)) == 0)
         return; /* no */
-    modstk(ptr->sp, NO, NO); /* else clean up stk ptr */
-    jump(ptr->exit); /* jump to exit label */
+    modstk(ptr->sp, KIND_NONE, NO, YES); /* else clean up stk ptr */
+    gen_jp_label(ptr->exit); /* jump to exit label */
 }
 
 /*
@@ -690,8 +620,8 @@ void docont()
         if (ptr->loop)
             break;
     }
-    modstk(ptr->sp, NO, NO); /* else clean up stk ptr */
-    jump(ptr->loop); /* jump to loop label */
+    modstk(ptr->sp, KIND_NONE, NO, YES); /* else clean up stk ptr */
+    gen_jp_label(ptr->loop); /* jump to loop label */
 }
 
 static void docritical(void)
@@ -700,12 +630,10 @@ static void docritical(void)
         errorfmt("Cannot nest __critical sections", 1);
     }
     incritical = 1;
-    zentercritical();
-    Zsp -= zcriticaloffset();
+    gen_critical_enter();
     statement();
-    zleavecritical();
+    gen_critical_leave();
     incritical = 0;
-    Zsp += zcriticaloffset();
 }
 
 /*
@@ -728,6 +656,7 @@ static void docritical(void)
 void doasmfunc(char wantbr)
 {
     char c;
+    int  lastwasLF = 0;
     if (wantbr)
         needchar('(');
 
@@ -738,13 +667,22 @@ void doasmfunc(char wantbr)
             c = litchar();
             if (c == 0)
                 break;
-            outbyte(c);
-            if (c == 10 || c == 13)
-                outstr("\n\t");
+            if ( lastwasLF && c != '\t' ) {
+                outstr("\t");
+            }
+            if (c == '\n' || c == '\r') {
+                lastwasLF = 1;
+                outbyte('\n');
+            } else {
+                lastwasLF = 0;
+                outbyte(c);
+            }
         }
     } while (cmatch('"'));
     needchar(')');
-    outbyte('\n');
+    if ( !lastwasLF ) {
+        outbyte('\n');
+    }
 }
 
 /*
@@ -808,7 +746,18 @@ void dopragma()
         set_section(&c_bss_section);
     else if (amatch("initseg"))
         set_section(&c_init_section);
-    else {
+    else if (amatch("bank")) {
+        Kind valtype;
+        double val;
+        char   buf[100];
+
+        if ( constexpr(&val, &valtype, 1) ) {
+            snprintf(buf,sizeof(buf),"CODE_%d",(int)val);
+            c_code_section = STRDUP(buf);
+            snprintf(buf,sizeof(buf),"RODATA_%d",(int)val);
+            c_rodata_section = STRDUP(buf);
+        }
+    }else {
         warningfmt("unknown-pragmas","Unknown #pragma directive");
         clear();
     }

@@ -20,10 +20,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\src\common\die.h" />
+    <ClInclude Include="..\..\src\common\dirname.h" />
     <ClInclude Include="..\..\src\common\fileutil.h" />
     <ClInclude Include="..\..\src\common\objfile.h" />
     <ClInclude Include="..\..\src\common\strutil.h" />
     <ClInclude Include="..\..\src\common\types.h" />
+    <ClInclude Include="..\..\src\common\zutils.h" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\regex\regex.vcxproj">
@@ -35,10 +37,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\common\die.c" />
+    <ClCompile Include="..\..\src\common\dirname.c" />
     <ClCompile Include="..\..\src\common\fileutil.c" />
     <ClCompile Include="..\..\src\common\objfile.c" />
     <ClCompile Include="..\..\src\common\optparse.c" />
     <ClCompile Include="..\..\src\common\strutil.c" />
+    <ClCompile Include="..\..\src\common\zutils.c" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <ProjectGuid>{00BCE225-FE40-4C33-B15E-C8FB6ADA74EB}</ProjectGuid>
@@ -100,7 +104,7 @@
       <Optimization>Disabled</Optimization>
       <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\ext\uthash\src;..\..\ext\UNIXem\include;..\..\ext\regex;..\..\ext\optparse</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src\z80asm;..\..\ext\uthash\src;..\..\ext\UNIXem\include;..\..\ext\regex;..\..\ext\optparse</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -129,7 +133,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_CRT_SECURE_NO_DEPRECATE;_CRT_NONSTDC_NO_DEPRECATE;WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <SDLCheck>true</SDLCheck>
-      <AdditionalIncludeDirectories>..\..\ext\uthash\src;..\..\ext\UNIXem\include;..\..\ext\regex;..\..\ext\optparse</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>..\..\src\z80asm;..\..\ext\uthash\src;..\..\ext\UNIXem\include;..\..\ext\regex;..\..\ext\optparse</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

@@ -3,7 +3,7 @@
 #
 # Plain Perl (no CPAN libraries) test library
 #
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2019
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
 # Repository: https://github.com/z88dk/z88dk
 #------------------------------------------------------------------------------
@@ -127,7 +127,7 @@ sub ticks {
 	build_ticks();
 	z80asm($source, $options." -b");
 	
-	my $cpu = ($options =~ /(?:--cpu=?|-m=?)(\S+)/) ? $1 : "z80";
+	my $cpu = ($options =~ /(?:-m=?)(\S+)/) ? $1 : "z80";
 	run("z88dk-ticks test.bin -m$cpu -output test.out", 
 		0, "IGNORE");
 

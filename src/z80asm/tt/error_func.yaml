@@ -1,7 +1,7 @@
 # Z88DK Z80 Macro Assembler
 #
 # Copyright (C) Gunther Strube, InterLogic 1993-99
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
 # Repository: https://github.com/pauloscustodio/z88dk-z80asm
 #
@@ -184,7 +184,12 @@ errors:
   - type	: ErrError
     func	: error_invalid_org_option
     args	: const char *org_hex
-    message	: "\"invalid --origin option '%s'\", org_hex"
+    message	: "\"invalid origin (-r) option '%s'\", org_hex"
+	
+  - type	: ErrError
+    func	: error_invalid_define_option
+    args	: const char *define
+    message	: "\"invalid -DVAR=VAL option '%s'\", define"
 	
   - type	: ErrError
     func	: error_invalid_org

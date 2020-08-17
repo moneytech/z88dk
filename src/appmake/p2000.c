@@ -51,14 +51,12 @@ int p2000_exec(char* target)
     }
 
     if ((fpin = fopen_bin(binname, NULL)) == NULL) {
-        fprintf(stderr, "Can't open input file %s\n", binname);
-        myexit(NULL, 1);
+        exit_log(1, "Can't open input file %s\n", binname);
     }
 
     if (fseek(fpin, 0, SEEK_END)) {
-        fprintf(stderr, "Couldn't determine size of file\n");
         fclose(fpin);
-        myexit(NULL, 1);
+        exit_log(1,"Couldn't determine size of file\n");
     }
 
     len = ftell(fpin);
@@ -68,19 +66,14 @@ int p2000_exec(char* target)
 
     if ((fpout = fopen(filename, "wb")) == NULL) {
         fclose(fpin);
-        myexit("Can't open output file\n", 1);
+        exit_log(1,"Can't open output file\n");
     }
 
     if (blockname == NULL)
-        blockname = binname;
+        blockname = zbasename(binname);
 
     /* Deal with the filename */
-    if (strlen(blockname) >= 8) {
-        strncpy(name, blockname, 8);
-    } else {
-        strcpy(name, blockname);
-        strncat(name, "        ", 8 - strlen(blockname));
-    }
+    snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, blockname);
 
     bcount = 0;
     for (j = 0; j < len; j++) {

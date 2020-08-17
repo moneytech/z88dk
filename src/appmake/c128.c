@@ -48,11 +48,9 @@ int c128_exec(char *target)
     FILE   *fpin;
     FILE   *fpout;
     long    pos;
-    char    mybuf[20];
     int     len,namelen;
     int     c,i;
-    char   *p;
-	int diskgap;
+    int diskgap;
 
     if ( help )
         return -1;
@@ -70,8 +68,8 @@ int c128_exec(char *target)
     /* strupr(filename);
        not available on all platforms */
     
-    for (p = filename; *p !='\0'; ++p)
-       *p = toupper(*p);
+    for (i = strlen(filename) - 1; i >= 0 && filename[i] != '/' && filename[i] != '\\'; i--)
+        filename[i] = toupper(filename[i]);
 
     suffix_change(filename,"");
 
@@ -81,8 +79,7 @@ int c128_exec(char *target)
     namelen=strlen(filename)-1;
 
     if ( strcmp(binname,filename) == 0 ) {
-        fprintf(stderr,"Input and output file names must be different\n");
-        myexit(NULL,1);
+        exit_log(1,"Input and output file names must be different\n");
     }
 
 
@@ -90,19 +87,17 @@ int c128_exec(char *target)
         pos = origin;
     } else {
 		if ( (pos = get_org_addr(crtfile)) == -1 ) {
-            myexit("Could not find parameter ZORG (not z88dk compiled?)\n",1);
+            exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
         }
     }
 
 	if ( (fpin=fopen_bin(binname, crtfile) ) == NULL ) {
-        fprintf(stderr,"Can't open input file %s\n",binname);
-        myexit(NULL,1);
+        exit_log(1,"Can't open input file %s\n",binname);
     }
 
     if (fseek(fpin,0,SEEK_END)) {
-        fprintf(stderr,"Couldn't determine size of file\n");
         fclose(fpin);
-        myexit(NULL,1);
+        exit_log(1,"Couldn't determine size of file\n");
     }
 
     len=ftell(fpin);
@@ -115,7 +110,7 @@ int c128_exec(char *target)
 		/* Open binary block for disk, put start addr on top */
 		if ( (fpout=fopen(filename,"wb") ) == NULL ) {
 			fclose(fpin);
-			myexit("Can't open output file\n",1);
+			exit_log(1,"Can't open output file\n");
 		}
 		writeword(pos,fpout);
 		
@@ -125,7 +120,7 @@ int c128_exec(char *target)
 		strcpy(tapfile,filename);
 		suffix_change(tapfile,".T64");
 		if ( (fpout=fopen(tapfile,"wb") ) == NULL ) {
-			myexit("Can't open output 'tape' file\n",1);
+			exit_log(1,"Can't open output 'tape' file\n");
 		}
 		
 		/* First 32 bytes, signature of the T64 file padded with $00 */
@@ -189,7 +184,7 @@ int c128_exec(char *target)
 	if (disk) {
 		fclose(fpout);
 		if ( (fpout=fopen(ldrfile,"wb") ) == NULL ) {
-			myexit("Can't create the loader file\n",1);
+			exit_log(1,"Can't create the loader file\n");
 		}
 		/* start address of the first line of the BASIC program */
 		writeword(0x1C01,fpout);

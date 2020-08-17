@@ -1,6 +1,7 @@
 @adt/adt_sccz80.lst
 @alloc/alloc_sccz80.lst
 @arch/cpm/cpm_sccz80.lst
+@arch/hbios/hbios_sccz80.lst
 @compress/compress_sccz80.lst
 @ctype/ctype_sccz80.lst
 @drivers/drivers.lst
@@ -17,14 +18,16 @@
 @libgen/libgen_sccz80.lst
 @locale/locale.lst
 @math/math_integer.lst
-@math/math_float_sccz80.lst
+@math/float/math48/math48_sccz80.lst
+@math/float/math32/math32_sccz80.lst
+@math/float/math32/math32_z80_common_asm.lst
 @network/network_sccz80.lst
 @setjmp/setjmp_sccz80.lst
 @stdio/stdio_sccz80.lst
 @stdlib/stdlib_sccz80.lst
 @string/string_sccz80.lst
 @target/rc2014/default/default.lst
-@target/rc2014/device/device.lst
+@target/rc2014/device/device_sccz80.lst
 @target/rc2014/driver/driver_sccz80.lst
 @target/cpm/driver/driver.lst
 @threads/threads_sccz80.lst

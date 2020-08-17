@@ -21,7 +21,6 @@ include "config_yaz180_public.inc"
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 include "../crt_defaults.inc"
-include "crt_yabios_def.inc"
 include "crt_config.inc"
 include(`../crt_rules.inc')
 include(`yaz180_rules.inc')
@@ -43,23 +42,21 @@ dnl
 dnl## input terminals
 dnl
 dnl#include(`../cpm/driver/terminal/cpm_00_input_cons.m4')
-dnl#include(`../cpm/driver/terminal/cpm_01_input_kbd_dcio.m4')
 dnl#include(`../cpm/driver/character/cpm_00_input_reader.m4')
 dnl
 dnl## output terminals
 dnl
 dnl#include(`../cpm/driver/terminal/cpm_00_output_cons.m4')
-dnl#include(`../cpm/driver/terminal/cpm_01_output_dcio.m4')
 dnl#include(`../cpm/driver/character/cpm_00_output_list.m4')
 dnl#include(`../cpm/driver/character/cpm_00_output_punch.m4')
 dnl
 dnl## file dup
 dnl
-dnl#include(`../m4_file_dup.m4')dnl
+dnl#include(`../m4_file_dup.m4')
 dnl
 dnl## empty fd slot
 dnl
-dnl#include(`../m4_file_absent.m4')dnl
+dnl#include(`../m4_file_absent.m4')
 dnl
 dnl############################################################
 dnl## INSTANTIATE DRIVERS #####################################
@@ -76,8 +73,8 @@ ifelse(eval(M4__CRT_INCLUDE_DRIVER_INSTANTIATION == 0), 1,
    include(`../cpm/driver/terminal/cpm_00_output_cons.m4')
    m4_cpm_00_output_cons(_stdout, 0x0010)
 
-   include(`../m4_file_dup.m4')dnl
-   m4_file_dup(_stderr, 0x80, __i_fcntl_fdstruct_1)dnl
+   include(`../m4_file_dup.m4')
+   m4_file_dup(_stderr, 0x80, __i_fcntl_fdstruct_1)
 
    include(`../cpm/driver/character/cpm_00_input_reader.m4')
    m4_cpm_00_input_reader(_stdrdr, 0x0100)
@@ -102,27 +99,7 @@ SECTION CODE
 
 PUBLIC __Start, __Exit
 
-EXTERN _main, asm_cpm_bdos
-
-Qualify:
-
-   ; disqualify 8080
-   
-   sub a
-   jp po, __Continue
-
-   ld c,__CPM_PRST
-   ld de,disqualify_s
-   
-   call asm_cpm_bdos
-   rst 0
-
-disqualify_s:
-
-   defm "z80 only"
-   defb 13,10,'$'
-
-__Continue:
+EXTERN _main
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ;; USER PREAMBLE ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
@@ -130,8 +107,7 @@ __Continue:
 
 IF __crt_include_preamble
 
-   include "crt_preamble.asm"
-   SECTION CODE
+   include "crt_preamble.asm"  ; user provided preamble
 
 ENDIF
 
@@ -152,55 +128,55 @@ __Restart:
 
    ; command line
 
-   IF __crt_enable_commandline = 1
+IF __crt_enable_commandline = 1
 
-      include "../crt_cmdline_empty.inc"
+   include "../crt_cmdline_empty.inc"
 
-   ENDIF
+ENDIF
 
-   IF __crt_enable_commandline >= 3
+IF __crt_enable_commandline >= 3
 
-      ; copy command line words from default dma buffer to stack
-      ; must do this as the default dma buffer may be used by the cpm program
+   ; copy command line words from default dma buffer to stack
+   ; must do this as the default dma buffer may be used by the cpm program
 
-      EXTERN l_command_line_parse
+   EXTERN l_command_line_parse
 
-      ld hl,0x0080             ; default dma buffer
+   ld hl,0x0080                ; default dma buffer
 
-      ld c,(hl)
-      ld b,h                   ; bc = length of command line
+   ld c,(hl)
+   ld b,h                      ; bc = length of command line
 
-      inc l
-      ex de,hl
+   inc l
+   ex de,hl
 
-      call l_command_line_parse
+   call l_command_line_parse
 
-      ; cpm does not supply program name in command line
-      ; so place empty string in argv[0] instead
+   ; cpm does not supply program name in command line
+   ; so place empty string in argv[0] instead
 
-      ; bc = int argc
-      ; hl = char *argv[]
-      ; de = & empty string
-      ; bc'= num chars in redirector
-      ; hl'= char *redirector
+   ; bc = int argc
+   ; hl = char *argv[]
+   ; de = & empty string
+   ; bc'= num chars in redirector
+   ; hl'= char *redirector
 
-      push de                  ; empty string added to front of argv[]
+   push de                     ; empty string added to front of argv[]
 
-      dec hl
-      dec hl                   ; char *argv[] adjusted to include empty string at index 0
+   dec hl
+   dec hl                      ; char *argv[] adjusted to include empty string at index 0
 
-      inc c                    ; argc++
+   inc c                       ; argc++
 
-   ENDIF
+ENDIF
 
 __Restart_2:
 
-   IF __crt_enable_commandline >= 1
+IF __crt_enable_commandline >= 1
 
-      push hl                  ; argv
-      push bc                  ; argc
+   push hl                     ; argv
+   push bc                     ; argc
 
-   ENDIF
+ENDIF
 
    ; initialize data section
 
@@ -211,7 +187,7 @@ __Restart_2:
    include "../clib_init_bss.inc"
 
    ; interrupt mode
-   
+
    include "../crt_set_interrupt_mode.inc"
 
 SECTION code_crt_init          ; user and library initialization
@@ -225,33 +201,33 @@ SECTION code_crt_main
    include "../crt_start_ei.inc"
 
    ; call user program
-   
+
    call _main                  ; hl = return status
 
    ; run exit stack
 
-   IF __clib_exit_stack_size > 0
+IF __clib_exit_stack_size > 0
 
-      EXTERN asm_exit
-      jp asm_exit              ; exit function jumps to __Exit
+   EXTERN asm_exit
+   jp asm_exit                 ; exit function jumps to __Exit
 
-   ENDIF
+ENDIF
 
 __Exit:
 
-   IF !((__crt_on_exit & 0x10000) && (__crt_on_exit & 0x8))
+IF !((__crt_on_exit & 0x10000) && (__crt_on_exit & 0x8))
 
-      ; not restarting
-      
-      push hl                  ; save return status
+   ; not restarting
 
-   ENDIF
+   push hl                     ; save return status
+
+ENDIF
 
 SECTION code_crt_exit          ; user and library cleanup
 SECTION code_crt_return
 
    ; close files
-   
+
    include "../clib_close.inc"
 
    ; terminate
@@ -265,7 +241,7 @@ SECTION code_crt_return
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 include "../crt_jump_vectors_z180.inc"
-include "crt_interrupt_vectors_z180.inc"
+include "../crt_interrupt_vectors_z180.inc"
 
 IF (__crt_on_exit & 0x10000) && ((__crt_on_exit & 0x6) || ((__crt_on_exit & 0x8) && (__register_sp = -1)))
 

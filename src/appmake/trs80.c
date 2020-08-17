@@ -8,8 +8,11 @@
  *        then at the '*?' prompt enter the program name (or its first letter) and press PLAY
  *        When the program is in memory, type '/'.
  *
+ *        CO format ( Stefano Bodrato, Feb 2020 )
+ *        Support for Olivetti M10, Kyotronic KC85, TRS80 M100, etc..
  *
- *        $Id: trs80.c,v 1.13 2016-06-26 00:46:55 aralbrec Exp $
+ *
+ *        $Id: trs80.c $
  */
 
 #include "appmake.h"
@@ -19,18 +22,20 @@ static char             *crtfile      = NULL;
 static char             *outfile      = NULL;
 static int               origin       = -1;
 static char              cmd          = 0;
+static char              co           = 0;
 static int               blocksz      = 256;
 static char              audio        = 0;
 static char              fast         = 0;
+static char              khz_22       = 0;
 static char              dumb         = 0;
 static char              loud         = 0;
 static char              help         = 0;
 
 static char              bit_state    = 0;
-static char              h_lvl;
-static char              l_lvl;
-static char              trs_h_lvl;
-static char              trs_l_lvl;
+static uint8_t           h_lvl;
+static uint8_t           l_lvl;
+static uint8_t           trs_h_lvl;
+static uint8_t           trs_l_lvl;
 
 
 /* Options that are available for this module */
@@ -40,9 +45,11 @@ option_t trs80_options[] = {
     { 'c', "crt0file", "crt0 file used in linking",  OPT_STR,   &crtfile },
     { 'o', "output",   "Name of output file",        OPT_STR,   &outfile },
     {  0 , "cmd",      ".CMD file format",           OPT_BOOL,  &cmd },
+    {  0 , "co",       "M100 .CO format",            OPT_BOOL,  &co },
     {  0 , "blocksz",  "Block size (10..256)",       OPT_INT,   &blocksz },
     {  0,  "audio",    "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",     "Tweak the audio tones to run a bit faster",  OPT_BOOL,  &fast },
+    {  0,  "22",        "22050hz bitrate option",     OPT_BOOL,  &khz_22 },
     {  0,  "dumb",     "Just convert to WAV a tape file",  OPT_BOOL,  &dumb },
     {  0,  "loud",     "Louder audio volume",        OPT_BOOL,  &loud },
     {  0 , "org",      "Origin of the binary",       OPT_INT,   &origin },
@@ -128,8 +135,8 @@ int trs80_exec(char* target)
     int i;
     int len;
     int pos;
-    unsigned char cksum;
-    char ckflag;
+    unsigned char cksum = 0;
+    char ckflag = 0;
 
     if (help || binname == NULL || (!dumb && (crtfile == NULL))) {
         return -1;
@@ -139,15 +146,18 @@ int trs80_exec(char* target)
         pos = origin;
     } else {
         if ((pos = get_org_addr(crtfile)) == -1) {
-            myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+            exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
         }
     }
 
+	if (co)
+		cmd = co;
+	
     if (audio)
-        cmd = 0;
-
+        co = cmd = 0;
+ 	
     if ((blocksz < 10) || (blocksz > 256)) {
-        myexit("Invalid block size: %d\n", blocksz);
+        exit_log(1,"Invalid block size: %d\n", blocksz);
     }
     if (cmd)
         blocksz -= 2;
@@ -159,7 +169,10 @@ int trs80_exec(char* target)
         if (outfile == NULL) {
             strcpy(filename, binname);
             if (cmd)
-                suffix_change(filename, ".cmd");
+				if (co)
+					suffix_change(filename, ".co");
+				else
+					suffix_change(filename, ".cmd");
             else
                 suffix_change(filename, ".cas");
         } else {
@@ -167,8 +180,7 @@ int trs80_exec(char* target)
         }
 
         if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-            fprintf(stderr, "Can't open input file %s\n", binname);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open input file %s\n", binname);
         }
 
         /*
@@ -177,7 +189,7 @@ int trs80_exec(char* target)
 	 */
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
 
         len = ftell(fpin);
@@ -189,8 +201,7 @@ int trs80_exec(char* target)
 	 */
 
         if ((fpout = fopen(filename, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output CMD file %s\n", filename);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open output CMD file %s\n", filename);
         }
 
         if (!cmd) {
@@ -205,12 +216,8 @@ int trs80_exec(char* target)
             fputc(0x55, fpout); /* system type filename header identifier */
 
             /* Deal with the filename */
-            if (strlen(binname) >= 6) {
-                strncpy(name, binname, 6);
-            } else {
-                strcpy(name, binname);
-                strncat(name, "      ", 6 - strlen(binname));
-            }
+            snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, binname);
+
             for (i = 0; i < 6; i++)
                 writebyte(toupper(name[i]), fpout);
         }
@@ -219,54 +226,66 @@ int trs80_exec(char* target)
 		 *   Main loop
 		 */
 
-        for (i = 0; i < len; i++) {
+		if (!co) {
+			for (i = 0; i < len; i++) {
 
-            if ((i % blocksz) == 0) {
-                if (cmd)
-                    writebyte(1, fpout); /* Block signature byte in CMD mode */
-                else
-                    writebyte(0x3c, fpout); /* Escape char for data block signature in CAS mode */
+				if ((i % blocksz) == 0) {
+					if (cmd)
+						writebyte(1, fpout); /* Block signature byte in CMD mode */
+					else
+						writebyte(0x3c, fpout); /* Escape char for data block signature in CAS mode */
 
-                if ((i + blocksz) > len)
-                    if (cmd)
-                        writebyte(len - i + 2, fpout); /* last block length (remainder) */
-                    else
-                        writebyte(len - i, fpout); /* last block length (remainder) */
-                else if (cmd)
-                    if (blocksz == 254)
-                        writebyte(0, fpout); /* block length (256 bytes) */
-                    else
-                        writebyte(blocksz + 2, fpout); /* block length */
-                else if (blocksz == 256)
-                    writebyte(0, fpout); /* block length (256 bytes) */
-                else
-                    writebyte(blocksz, fpout); /* block length (CAS mode)*/
+					if ((i + blocksz) > len)
+						if (cmd)
+							writebyte(len - i + 2, fpout); /* last block length (remainder) */
+						else
+							writebyte(len - i, fpout); /* last block length (remainder) */
+					else if (cmd)
+						if (blocksz == 254)
+							writebyte(0, fpout); /* block length (256 bytes) */
+						else
+							writebyte(blocksz + 2, fpout); /* block length */
+					else if (blocksz == 256)
+						writebyte(0, fpout); /* block length (256 bytes) */
+					else
+						writebyte(blocksz, fpout); /* block length (CAS mode)*/
 
-                writeword(pos + i, fpout); /* block memory location */
-                cksum = (pos + i) % 256 + (pos + i) / 256; /* Checksum (for CAS mode) */
-            }
+					writeword(pos + i, fpout); /* block memory location */
+					cksum = (pos + i) % 256 + (pos + i) / 256; /* Checksum (for CAS mode) */
+				}
 
-            c = getc(fpin);
-            cksum += c; /* Checksum (for CAS mode) */
-            fputc(c, fpout);
-            ckflag = 1;
+				c = getc(fpin);
+				cksum += c; /* Checksum (for CAS mode) */
+				fputc(c, fpout);
+				ckflag = 1;
 
-            if (!cmd && ((i + 1) % blocksz == 0)) {
-                writebyte(cksum, fpout); /* Checksum (for CAS mode) */
-                ckflag = 0;
-            }
-        }
+				if (!cmd && ((i + 1) % blocksz == 0)) {
+					writebyte(cksum, fpout); /* Checksum (for CAS mode) */
+					ckflag = 0;
+				}
+			}
+			
+			if (cmd) {
+				writebyte(2, fpout); /* Two bytes end marker in CMD mode*/
+				writebyte(2, fpout);
+			} else {
+				if (ckflag)
+					writebyte(cksum, fpout); /* Checksum */
+				writebyte(0x78, fpout); /* Escape char for EOF in CAS mode */
+			}
+		}
 
-        if (cmd) {
-            writebyte(2, fpout); /* Two bytes end marker in CMD mode*/
-            writebyte(2, fpout);
-        } else {
-            if (ckflag)
-                writebyte(cksum, fpout); /* Checksum */
-            writebyte(0x78, fpout); /* Escape char for EOF in CAS mode */
-        }
 
         writeword(pos, fpout); /* Start address */
+		
+		if (co) {
+			writeword(len, fpout); /* Program length */
+			writeword(pos, fpout); /* Program entry */
+			for (i = 0; i < len; i++) {
+				c = getc(fpin);
+				fputc(c, fpout);
+			}
+		}
 
         fclose(fpin);
         fclose(fpout);
@@ -275,15 +294,14 @@ int trs80_exec(char* target)
     /* ***************************************** */
     /*  Now, if requested, create the audio file */
     /* ***************************************** */
-    if ((audio) || (fast) || (loud)) {
+    if ((audio) || (fast) || (khz_22) || (loud)) {
         if ((fpin = fopen(filename, "rb")) == NULL) {
-            fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open file %s for wave conversion\n", filename);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
         len = ftell(fpin);
         fseek(fpin, 0, SEEK_SET);
@@ -293,8 +311,7 @@ int trs80_exec(char* target)
         suffix_change(wavfile, ".RAW");
 
         if ((fpout = fopen(wavfile, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output raw audio file %s\n", wavfile);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open output raw audio file %s\n", wavfile);
         }
 
         /* leading silence */
@@ -308,13 +325,11 @@ int trs80_exec(char* target)
         } while ((c == 0) && (len > 0));
 
         if (len < 10) {
-            fprintf(stderr, "Invalid .CAS file %s\n", filename);
-            myexit(NULL, 1);
+            exit_log(1,"Invalid .CAS file %s\n", filename);
         }
 
         if (c != 0xA5) {
-            fprintf(stderr, "Header marker not found:0xA5\n");
-            myexit(NULL, 1);
+            exit_log(1, "Header marker not found: 0xA5\n");
         }
 
         len--;
@@ -359,7 +374,10 @@ int trs80_exec(char* target)
         fclose(fpout);
 
         /* Now complete with the WAV header */
-        raw2wav(wavfile);
+		if (khz_22)
+			raw2wav_22k(wavfile,2);
+		else
+			raw2wav(wavfile);
 
     } /* END of WAV CONVERSION BLOCK */
 

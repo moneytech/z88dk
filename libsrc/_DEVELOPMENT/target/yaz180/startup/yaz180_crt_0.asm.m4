@@ -51,11 +51,11 @@ dnl#include(`driver/terminal/rc_01_output_asci1.m4')
 dnl
 dnl## file dup
 dnl
-dnl#include(`../m4_file_dup.m4')dnl
+dnl#include(`../m4_file_dup.m4')
 dnl
 dnl## empty fd slot
 dnl
-dnl#include(`../m4_file_absent.m4')dnl
+dnl#include(`../m4_file_absent.m4')
 dnl
 dnl############################################################
 dnl## INSTANTIATE DRIVERS #####################################
@@ -106,8 +106,7 @@ EXTERN _main
 
 IF __crt_include_preamble
 
-   include "crt_preamble.asm"
-   SECTION CODE
+   include "crt_preamble.asm"  ; first pass of user provided preamble
 
 ENDIF
 
@@ -138,26 +137,26 @@ __Restart:
 
    ; command line
 
-   IF (__crt_enable_commandline = 1) || (__crt_enable_commandline >= 3)
+IF (__crt_enable_commandline = 1) || (__crt_enable_commandline >= 3)
 
-      include "../crt_cmdline_empty.inc"
+   include "../crt_cmdline_empty.inc"
 
-   ENDIF
+ENDIF
 
 __Restart_2:
 
-   IF __crt_enable_commandline >= 1
+IF __crt_enable_commandline >= 1
 
-      push hl                  ; argv
-      push bc                  ; argc
+   push hl                     ; argv
+   push bc                     ; argc
 
-   ENDIF
+ENDIF
 
-   IF __crt_include_preamble
+IF __crt_include_preamble
 
-      include "crt_preamble.asm"
+   include "crt_preamble.asm"  ; second pass of user provided preamble
 
-   ENDIF
+ENDIF
 
    ; initialize data section
 
@@ -168,7 +167,7 @@ __Restart_2:
    include "../clib_init_bss.inc"
 
    ; interrupt mode
-   
+
    include "../crt_set_interrupt_mode.inc"
 
 SECTION code_crt_init          ; user and library initialization
@@ -182,33 +181,33 @@ SECTION code_crt_main
    include "../crt_start_ei.inc"
 
    ; call user program
-   
+
    call _main                  ; hl = return status
 
    ; run exit stack
 
-   IF __clib_exit_stack_size > 0
+IF __clib_exit_stack_size > 0
 
-      EXTERN asm_exit
-      jp asm_exit              ; exit function jumps to __Exit
+   EXTERN asm_exit
+   jp asm_exit                 ; exit function jumps to __Exit
 
-   ENDIF
+ENDIF
 
 __Exit:
 
-   IF !((__crt_on_exit & 0x10000) && (__crt_on_exit & 0x8))
+IF !((__crt_on_exit & 0x10000) && (__crt_on_exit & 0x8))
 
-      ; not restarting
-      
-      push hl                  ; save return status
+   ; not restarting
 
-   ENDIF
+   push hl                     ; save return status
+
+ENDIF
 
 SECTION code_crt_exit          ; user and library cleanup
 SECTION code_crt_return
 
    ; close files
-   
+
    include "../clib_close.inc"
 
    ; terminate
@@ -222,7 +221,7 @@ SECTION code_crt_return
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 include "../crt_jump_vectors_z180.inc"
-include "crt_interrupt_vectors_z180.inc"
+include "../crt_interrupt_vectors_z180.inc"
 
 IF (__crt_on_exit & 0x10000) && ((__crt_on_exit & 0x6) || ((__crt_on_exit & 0x8) && (__register_sp = -1)))
 

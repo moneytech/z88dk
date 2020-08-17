@@ -45,9 +45,8 @@ int z1013_exec(char* target)
     FILE* fpout;
     long pos;
     char name[17];
-    int len, namelen;
+    int len;
     int c, i;
-    char* p;
 
     if (help)
         return -1;
@@ -65,40 +64,36 @@ int z1013_exec(char* target)
     // strupr(filename);
     // not available on all platforms
 
-    for (p = filename; *p != '\0'; ++p)
-        *p = toupper(*p);
+    for (i = strlen(filename) - 1; i >= 0 && filename[i] != '/' && filename[i] != '\\'; i--)
+        filename[i] = toupper(filename[i]);
 
     //
 
     suffix_change(filename, ".Z80");
 
-    namelen = strlen(filename) - 1;
 
     if (strcmp(binname, filename) == 0) {
-        fprintf(stderr, "Input and output file names must be different\n");
-        myexit(NULL, 1);
+        exit_log(1,"Input and output file names must be different\n");
     }
 
     if (blockname == NULL)
-        blockname = binname;
+        blockname = zbasename(binname);
 
     if (origin != -1) {
         pos = origin;
     } else {
         if ((pos = get_org_addr(crtfile)) == -1) {
-            myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+            exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
         }
     }
 
     if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-        fprintf(stderr, "Can't open input file %s\n", binname);
-        myexit(NULL, 1);
+        exit_log(1, "Can't open input file %s\n", binname);
     }
 
     if (fseek(fpin, 0, SEEK_END)) {
-        fprintf(stderr, "Couldn't determine size of file\n");
         fclose(fpin);
-        myexit(NULL, 1);
+        exit_log(1,"Couldn't determine size of file\n");
     }
 
     len = ftell(fpin);
@@ -107,7 +102,7 @@ int z1013_exec(char* target)
 
     if ((fpout = fopen(filename, "wb")) == NULL) {
         fclose(fpin);
-        myexit("Can't open output file\n", 1);
+        exit_log(1,"Can't open output file\n");
     }
 
     writeword(pos, fpout);

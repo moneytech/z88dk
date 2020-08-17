@@ -603,7 +603,7 @@ nogood:	unget();
 }
 
 FILE_LOCAL int
-bittest(value)
+bittest(int value)
 /*
  * TRUE if value is zero or exactly one bit is set in value.
  */
@@ -777,7 +777,8 @@ int		skip;		/* TRUE if short-circuit evaluation	*/
  * evaleval() returns the new pointer to the top of the value stack.
  */
 {
-	register int	v1, v2;
+	register int	v1;
+	register int    v2 = 0;
 
 	if (isbinary(op))
 	    v2 = *--valp;

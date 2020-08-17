@@ -9,8 +9,9 @@
 	SECTION	code_compiler
 
 ._double_post_increment
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,3	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
@@ -22,8 +23,7 @@
 	call	dstore
 	call	dpush
 	ld	hl,65535	;const
-	ld	de,65535
-	call	float
+	call	l_int2long_s_float
 	call	dadd
 	ld	hl,0	;const
 	add	hl,sp
@@ -36,8 +36,9 @@
 
 
 ._double_post_increment_assign
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,3	;const
+	call	l_int2long_u_float
+	call	dpush
 	push	bc
 	push	bc
 	push	bc
@@ -55,8 +56,7 @@
 	call	dstore
 	call	dpush
 	ld	hl,65535	;const
-	ld	de,65535
-	call	float
+	call	l_int2long_s_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -71,8 +71,9 @@
 
 
 ._double_pre_increment
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,3	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
@@ -93,8 +94,9 @@
 
 
 ._double_pre_increment_assign
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,3	;const
+	call	l_int2long_u_float
+	call	dpush
 	push	bc
 	push	bc
 	push	bc
@@ -123,15 +125,15 @@
 
 
 ._double_post_decrement
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,3	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,65535	;const
-	ld	de,65535
-	call	float
+	call	l_int2long_s_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -150,8 +152,9 @@
 
 
 ._double_post_decrement_assign
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,3	;const
+	call	l_int2long_u_float
+	call	dpush
 	push	bc
 	push	bc
 	push	bc
@@ -163,8 +166,7 @@
 	push	hl
 	call	dldpsh
 	ld	hl,65535	;const
-	ld	de,65535
-	call	float
+	call	l_int2long_s_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -185,15 +187,15 @@
 
 
 ._double_pre_decrement
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,3	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,65535	;const
-	ld	de,65535
-	call	float
+	call	l_int2long_s_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -208,8 +210,9 @@
 
 
 ._double_pre_decrement_assign
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,3	;const
+	call	l_int2long_u_float
+	call	dpush
 	push	bc
 	push	bc
 	push	bc
@@ -221,8 +224,7 @@
 	push	hl
 	call	dldpsh
 	ld	hl,65535	;const
-	ld	de,65535
-	call	float
+	call	l_int2long_s_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -237,10 +239,6 @@
 	ret
 
 
-	SECTION	rodata_compiler
-.i_2
-	;3.000000
-	defb	0x00,0x00,0x00,0x00,0x40,0x82
 
 
 	SECTION	bss_compiler

@@ -72,8 +72,7 @@ EXTERN ASMDISP_ZX_CYX2SADDR_CALLEE
    
 .nomatch
 
-   ld a,8
-   sub b
+   ld a,b			;Remaining rows in font left
    add a,e
    ld e,a
    jp nc, cont2
@@ -90,4 +89,4 @@ EXTERN ASMDISP_ZX_CYX2SADDR_CALLEE
    scf
    ret
 
-DEFC ASMDISP_ZX_SCREENSTR_CALLEE = # asmentry - zx_screenstr_callee
+DEFC ASMDISP_ZX_SCREENSTR_CALLEE = asmentry - zx_screenstr_callee

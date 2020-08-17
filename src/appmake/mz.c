@@ -1,20 +1,20 @@
 /*
  *        BIN to MZ Sharp M/C file
  *
- *        $Id: mz.c,v 1.17 2016-06-26 00:46:55 aralbrec Exp $
+ *        $Id: mz.c $
  *
  *        bin2m12 by: Stefano Bodrato 4/5/2000
  *        portions from mzf2wav by: Jeroen F. J. Laros. Sep 11 2003.
  *        turbo loader comes from TransManager by Miroslav Nemecek.
- * 
+ *
  * Original copyright message from mzf2wav:
  * -----------------------------------------
- * This program is freeware and may be used without paying any registration 
- * fees. It may be distributed freely provided it is done so using the 
- * original, unmodified version. Usage of parts of the source code is granted, 
- * provided the author is referenced. For private use only. Re-selling or any 
+ * This program is freeware and may be used without paying any registration
+ * fees. It may be distributed freely provided it is done so using the
+ * original, unmodified version. Usage of parts of the source code is granted,
+ * provided the author is referenced. For private use only. Re-selling or any
  * commercial use of this program or parts of it is strictly forbidden. The
- * author is not responsible for any damage or data loss as a result of using 
+ * author is not responsible for any damage or data loss as a result of using
  * this program.
  */
 
@@ -28,10 +28,11 @@ static int               origin       = -1;
 static char              help         = 0;
 static char              audio        = 0;
 static char              fast         = 0;
+static char              khz_22       = 0;
+static char              loud         = 0;
 static char              mz80b        = 0;
 static char              turbo        = 0;
 static char              dumb         = 0;
-static char              loud         = 0;
 static char             *src          = NULL;
 static char             *dst          = NULL;
 static char              foopatch     = 0;
@@ -62,14 +63,15 @@ option_t mz_options[] = {
     { 'o', "output",   "Name of output file",        OPT_STR,   &outfile },
     {  0,  "audio",    "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",     "Create a fast loading WAV",  OPT_BOOL,  &fast },
+    {  0,  "22",       "22050hz bitrate option",     OPT_BOOL,  &khz_22 },
+    {  0,  "loud",     "Louder audio volume",        OPT_BOOL,  &loud },
+    {  0,  "turbo",    "Turbo tape loader",          OPT_BOOL,  &turbo },
     {  0,  "mz80b",    "MZ80B mode (faster 1800bps)",   OPT_BOOL,  &mz80b },
     {  0,  "src",      "Patch from (80B,700,2000,sos)",  OPT_STR,   &src },
     {  0,  "dst",      "Patch to (80B,700,2000,sos)",    OPT_STR,   &dst },
     {  0,  "foopatch", "Patch unknown locations with BEEP",    OPT_BOOL,  &foopatch },
     {  0,  "patchall", "Patch more types of JPs and CALLs",    OPT_BOOL,  &aggressive_patch },
-    {  0,  "turbo",    "Turbo tape loader",          OPT_BOOL,  &turbo },
     {  0,  "dumb",     "Just convert to WAV a tape file",  OPT_BOOL,  &dumb },
-    {  0,  "loud",     "Louder audio volume",        OPT_BOOL,  &loud },
     {  0 , "org",      "Origin of the binary",       OPT_INT,   &origin },
     {  0 , "blockname", "Opt name for the code block", OPT_STR, &blockname},
     {  0,  NULL,       NULL,                         OPT_NONE,  NULL }
@@ -288,7 +290,7 @@ unsigned int mz2000_codes[] = {
 	0x0768,	// stop continous sound    ** RET **
 
 	0x00B1,	// MONITOR entry
-	
+
 	0x05D8,	// print hex value of HL
 	0x05DD,	// print hex value of A
 	0x05f3,	// format hex digit to ascii
@@ -374,7 +376,7 @@ unsigned int sos_codes[] = {
 	0x1fb5,	// format ascii to hex digit
 	0x1fb5,	// format ascii to hex digit
 	0x1fca,	// Wait for a key and get key code
-	
+
 	0x1fd6,	// ASCII code to display code conversion
 //	0x0fb1,	// console stuff ?  (c53)
 	0x1fd6,	// console stuff ?	(8ee)
@@ -422,7 +424,7 @@ void sp(void) {
 /* Write a gap of i short pulses */
 void gap(int i) {
   int j = 0;
-  
+
   for (j = 0; j < i; j++)
     sp();
 }
@@ -443,7 +445,7 @@ void tapemark(int i) {
 void writecs(unsigned int cs) {
   unsigned char i = 0;
   int j = 0;
-  
+
   cs &= 0xffff;
   for (j = 0x3; j; j /= 2) {
     for (i = 0xff; i; i /= 2) {
@@ -452,7 +454,7 @@ void writecs(unsigned int cs) {
       else
         sp();                    /* Else write a zero.  */
       cs *= 2;                  /* Go to the next bit. */
-    } 
+    }
     lp();
   }
   lp();
@@ -462,7 +464,7 @@ void writecs(unsigned int cs) {
 unsigned int mz_rawout(unsigned char b) {
   unsigned int cs = 0;
   unsigned char i = 0;
-  
+
   for (i = 0xff; i; i /= 2) {
     if (b & 0x80) {
       lp();
@@ -490,13 +492,13 @@ void mz_patch (unsigned char *image, unsigned int *src_table, unsigned int *dst_
 
 	for (i = 0x80; i < len; i++) {   /* The mzf body. */
 		/* call or jump ? */
-		if ( (image[i]==0xCD) || (image[i]==0xC3) || (image[i]==0xCC) || (image[i]==0xCA) || 
+		if ( (image[i]==0xCD) || (image[i]==0xC3) || (image[i]==0xCC) || (image[i]==0xCA) ||
 			( aggressive_patch && (
-				(image[i]==0xDC) || (image[i]==0xFC) || (image[i]==0xD4) || 
+				(image[i]==0xDC) || (image[i]==0xFC) || (image[i]==0xD4) ||
 				(image[i]==0xC4) || (image[i]==0xF4) || (image[i]==0xEC) || (image[i]==0xE4) ||
-				(image[i]==0xDA) || (image[i]==0xFA) || (image[i]==0xD2) || 
+				(image[i]==0xDA) || (image[i]==0xFA) || (image[i]==0xD2) ||
 				(image[i]==0xC2) || (image[i]==0xF2) || (image[i]==0xEA) || (image[i]==0xE2) )) ) {
-					
+
 			x=0; patched=0;
 			call_location = image[i+1] + (image[i+2] * 256);
 			while (dst_table[x]!=0) {
@@ -508,13 +510,14 @@ void mz_patch (unsigned char *image, unsigned int *src_table, unsigned int *dst_
 				}
 				x++;
 			}
-			
+
 			if ( !patched && (call_location < org_location) && (call_location != 0) ) {
 					printf("\nWarning: Location %x, opcode '%x', unknown address $%x", org_location + i - 0x80, image[i], call_location);
-					if (foopatch)
+					if (foopatch) {
 						printf(" -> BEEP");
 						image[i+1]=dst_table[0]%256;
 						image[i+2]=dst_table[0]/256;
+                                        }
 				}
 
 		}
@@ -532,7 +535,7 @@ void mz_encode (unsigned char *image) {
 
 	/* Get the actual file length (header + data) */
 	len = (image[0x12] + (image[0x13] * 256) + 0x80);
-	
+
 	cs = 0;
 	gap(15000);                     /* Long gap. */
 
@@ -550,7 +553,7 @@ void mz_encode (unsigned char *image) {
 			mz_rawout(image[i]);
 		writecs(cs);                    /* The copy of the checksum of the mzf header. */
 	}
-	
+
 	gap(8000);                      /* Short gap. */
 
 	tapemark(20);                   /* Short tapemark. */
@@ -572,18 +575,18 @@ void mz_encode (unsigned char *image) {
 
 
 /* This is the turbo loader in MZF format. */
-unsigned char turboldr[300] = { 
+unsigned char turboldr[300] = {
   0x01,                                                 // Program type.
- 
+
   0x0d, 0x0d, 0x0d, 0x0d, 0x0d,                         // Room for the
   0x0d, 0x0d, 0x0d, 0x0d, 0x0d,                         // image name.
   0x0d, 0x0d, 0x0d, 0x0d, 0x0d, 0x0d, 0x0d,
- 
+
   0x5a, 0x00,                                           // File size.
   0x00, 0xd4,                                           // Load adress.
   0x00, 0xd4,                                           // Execution adress.
   '[', 't', 'u', 'r', 'b', 'o', ']',                    // The first 7 bytes.
-  
+
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Room for comment.
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // minus 7 bytes.
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -595,15 +598,15 @@ unsigned char turboldr[300] = {
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
   0x00, 0x00, 0x00, 0x00, 0x00,
-  
+
   0xcd, 0x00,                                           // End Header.
-  
+
   // Begin Program.
   0x3e, 0x08,       // D400: LD A, 08h
   0xd3, 0xce,       // D402: OUT (0ceh), A  ; Set video mode?
-  
+
   0xe5,             // D404: PUSH HL
-  
+
   0x21, 0x00, 0x00, // D405: LD HL, 0000h
   0xd3, 0xe4,       // D408: OUT (0e4h), A  ; Bank switch to ROM?
 
@@ -612,11 +615,11 @@ unsigned char turboldr[300] = {
 
   0x77,             // D40D: LD (HL), A
   0x23,             // D40E: INC HL
-  
+
   0x7c,             // D40F: LD A, H
   0xfe, 0x10,       // D410: CP 10h
   0x20, 0xf4,       // D412: JR NZ, f4h    ; Jump 0xf4 forward if A != 0x10
-  
+
   0x3a, 0x4b, 0xd4, // D414: LD A, (d44bh)
   0x32, 0x4b, 0x0a, // D417: LD (0a4bh), A ; (0x0a4b) = (0xd44b)
   0x3a, 0x4c, 0xd4, // D41A: LD A, (d44ch)
@@ -625,13 +628,13 @@ unsigned char turboldr[300] = {
   0x11, 0x02, 0x11, // D423: LD DE, 1102h
   0x01, 0x0d, 0x00, // D426: LD BC, 000dh
   0xed, 0xb0,       // D429: LDIR          ; Copy 0x0d bytes from (HL) to (DE)
-  
+
   0xe1,             // D42B: POP HL
-  
+
   0x7c,             // D42C: LD A, H
   0xfe, 0xd4,       // D42D: CP d4h
   0x28, 0x12,       // D42F: JR Z, 12h     ; Jump to label #1 if A == 0xd4
-  
+
   0x2a, 0x04, 0x11, // D431: LD HL, (1104h)
   0xd9,             // D434: EXX           ; BC/DE/HL <-> BC'/DE'/HL'
   0x21, 0x00, 0x12, // D435: LD HL, 1200h
@@ -639,14 +642,14 @@ unsigned char turboldr[300] = {
   0xcd, 0x2a, 0x00, // D43B: CALL 002ah    ; Read data subroutine.
   0xd3, 0xe4,       // D43E: OUT (0e4h), A ; Bank switch to ROM?
   0xc3, 0x9a, 0xe9, // D440: JP e99ah      ; Jump to 0xe99a
-  
+
   0xcd, 0x2a, 0x00, // D443: CALL (002ah)  ; Label #1 (read data sub).
   0xd3, 0xe4,       // D446: OUT (0e4h), A ; Bank switch to ROM?
   0xc3, 0x24, 0x01, // D448: JP (0124h)
   // End program.
 
-  0x15, 0x01,       // D44B: 
-  
+  0x15, 0x01,       // D44B:
+
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00,      // Room for the address information
   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 // + the first 7 bytes of comment.
 };
@@ -676,8 +679,7 @@ int mz_exec(char *target)
 	if ( dst != NULL )
 	{
 		if ( src == NULL ) {
-			fprintf(stderr,"Please specify the source model for patching\n");
-			myexit(NULL,1);
+			exit_log(1,"Please specify the source model for patching\n");
 		}
 		if ((strcmp(dst,"80b") == 0) || (strcmp(dst,"80b") == 0))
 			dst_codes = mz80b_codes;
@@ -692,16 +694,14 @@ int mz_exec(char *target)
 			dst_codes = sos_codes;
 
 		if (dst_codes == 0) {
-			fprintf(stderr,"Specified dst model for patching is not valid\n");
-			myexit(NULL,1);
+			exit_log(1,"Specified dst model for patching is not valid\n");
 		}
 	}
 
 	if ( src != NULL )
 	{
 		if ( dst == NULL ) {
-			fprintf(stderr,"Please specify the destination model for patching\n");
-			myexit(NULL,1);
+			exit_log(1,"Please specify the destination model for patching\n");
 		}
 		if ((strcmp(src,"80b") == 0) || (strcmp(src,"80b") == 0))
 			src_codes = mz80b_codes;
@@ -716,13 +716,11 @@ int mz_exec(char *target)
 			src_codes = sos_codes;
 
 		if (src_codes == 0) {
-			fprintf(stderr,"Specified src model for patching is not valid\n");
-			myexit(NULL,1);
+			exit_log(1,"Specified src model for patching is not valid\n");
 		}
 
 		if (src_codes == dst_codes) {
-			fprintf(stderr,"MZ src and dst models must be different for patching\n");
-			myexit(NULL,1);
+			exit_log(1,"MZ src and dst models must be different for patching\n");
 		}
 	}
 
@@ -747,18 +745,17 @@ int mz_exec(char *target)
 		}
 
 		if ( blockname == NULL )
-			blockname = binname;
+			blockname = zbasename(binname);
 
 		if ( strcmp(binname,filename) == 0 ) {
-			fprintf(stderr,"Input and output file names must be different\n");
-			myexit(NULL,1);
+			exit_log(1,"Input and output file names must be different\n");
 		}
 
 		if ( origin != -1 ) {
 			pos = origin;
 		} else {
 			if ( (pos = get_org_addr(crtfile)) == -1 ) {
-				myexit("Could not find parameter ZORG (not z88dk compiled?)\n",1);
+				exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
 			}
 		}
 
@@ -774,7 +771,7 @@ int mz_exec(char *target)
 	 */
 		if (fseek(fpin,0,SEEK_END)) {
 			fclose(fpin);
-			myexit("Couldn't determine size of file\n",1);
+			exit_log(1,"Couldn't determine size of file\n");
 		}
 
 		len=ftell(fpin);
@@ -783,34 +780,30 @@ int mz_exec(char *target)
 
 		if ( (fpout=fopen(filename,"wb") ) == NULL ) {
 			fclose(fpin);
-			printf("Can't open output file %s\n",filename);
-			myexit(NULL,1);
+			exit_log(1,"Can't open output file %s\n",filename);
 		}
 
 
 		/* Write out the MZ file */
-		
+
 		/* ******** */
 		/*  HEADER  */
 		/* ******** */
-		
+
 		fputc(1,fpout);			/* MZ80K M/C progtam file type */
-		
+
 		/* Deal with the filename */
-		if (strlen(blockname) > 16 ) {
-			strncpy(name,blockname,16);
-		} else {
-			strcpy(name,blockname);
-			//strncat(name,"\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",17-strlen(blockname));
-			strncat(name,"\15\15\15\15\15\15\15\15\15\15\15\15\15\15\15\15\15",17-strlen(blockname));
-		}
+
+        memset(name, '\15', sizeof(name)-1);
+        name[sizeof(name)-1] = 0;
+        memcpy(name, blockname, (strlen(blockname) < sizeof(name)-1) ? strlen(blockname) : sizeof(name)-1);
 
 		for (i=0;i<17;i++)		/* File name */
 			if(name[i]<32)
 				fputc(13,fpout);
 			else
 				fputc(toupper(name[i]),fpout);
-		
+
 		writeword(len,fpout);	/* Block byte size */
 		writeword(pos,fpout);	/* Binary block location */
 		writeword(pos,fpout);	/* Execution address (autorun) */
@@ -828,7 +821,7 @@ int mz_exec(char *target)
 			for (i=0;i<104;i++)
 				fputc(0,fpout);
 		}
-		
+
 		/* *********** */
 		/* ... M/C ... */
 		/* *********** */
@@ -844,18 +837,17 @@ int mz_exec(char *target)
 	/* ************************************************** */
 	/*  Now, if requested, mzf2wav creates the audio file */
 	/* ************************************************** */
-	if (( audio ) || (src_codes != 0)) {
+    if ((audio) || (fast) || (khz_22) || (loud) || (src_codes != 0)) {
 
 		strcpy(wavfile,filename);
 
 		if ( (fpin=fopen(filename,"rb") ) == NULL ) {
-			fprintf(stderr,"Can't open file %s for wave conversion\n",filename);
-			myexit(NULL,1);
+			exit_log(1,"Can't open file %s for wave conversion\n",filename);
 		}
 
         if (fseek(fpin,0,SEEK_END)) {
            fclose(fpin);
-           myexit("Couldn't determine size of file\n",1);
+           exit_log(1,"Couldn't determine size of file\n");
         }
         len=ftell(fpin);
         fseek(fpin,0L,SEEK_SET);
@@ -864,8 +856,7 @@ int mz_exec(char *target)
 		i = 0;
 
 		if (!image) {
-			fprintf(stderr,"Can't allocate temp memory to load '%s' for audio conversion\n",filename);
-			myexit(NULL,1);
+			exit_log(1,"Can't allocate temp memory to load '%s' for audio conversion\n",filename);
 		}
 
 		/* Load program in a temp memory space */
@@ -892,8 +883,7 @@ int mz_exec(char *target)
 
 		/* Check the file comparing the declared size to its real one */
 		if ((image[0x12] + (image[0x13] * 256) + 0x80)!=len) {
-			fprintf(stderr,"MZF file corrupt: %s\n",filename);
-			myexit(NULL,1);
+			exit_log(1,"MZF file corrupt: %s\n",filename);
 		}
 
 		if (src_codes != 0) {
@@ -902,8 +892,7 @@ int mz_exec(char *target)
 
 				suffix_change(filename,"_patched.mzf");
 				if ( (fpout=fopen(filename,"wb") ) == NULL ) {
-					fprintf(stderr,"Can't open output patched file %s\n",filename);
-					myexit(NULL,1);
+					exit_log(1,"Can't open output patched file %s\n",filename);
 				}
 				for (i=0; i<len; i++)	fputc (image[i],fpout);
 				fclose(fpout);
@@ -916,8 +905,7 @@ int mz_exec(char *target)
 
 			suffix_change(wavfile,".RAW");
 			if ( (rawout=fopen(wavfile,"wb") ) == NULL ) {
-				fprintf(stderr,"Can't open output raw audio file %s\n",wavfile);
-				myexit(NULL,1);
+				exit_log(1,"Can't open output raw audio file %s\n",wavfile);
 			}
 
 			if (turbo) {
@@ -955,7 +943,7 @@ int mz_exec(char *target)
 					SHORT_DOWN = 7;
 				}
 			}
-			
+
 			if (turbo) {
 				mz_encode(turboldr);
 
@@ -965,7 +953,7 @@ int mz_exec(char *target)
 				SHORT_DOWN = 6;
 
 				mz_encode(image);
-				
+
 			} else {
 				mz_encode(image);
 			}
@@ -973,12 +961,13 @@ int mz_exec(char *target)
 
 			fclose(rawout);
 			free(image);
-			
+
 			/* Now let's think at the WAV format */
-			raw2wav(wavfile);
+			if (khz_22)
+				raw2wav_22k(wavfile,2);
+			else
+				raw2wav(wavfile);
 		}
 	}
     return 0;
 }
-                
-

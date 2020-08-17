@@ -18,14 +18,14 @@
 @locale/locale.lst
 @math/math_integer.lst
 @math/math_integer_z180.lst
-@math/math_float_sccz80.lst
+@math/math_float_sccz80_z180.lst
 @network/network_sccz80.lst
 @setjmp/setjmp_sccz80.lst
 @stdio/stdio_sccz80.lst
 @stdlib/stdlib_sccz80.lst
 @string/string_sccz80.lst
 @target/yaz180/default/default.lst
-@target/yaz180/device/device.lst
+@target/yaz180/device/device_sccz80.lst
 @target/yaz180/driver/driver_sccz80.lst
 @target/cpm/driver/driver.lst
 @threads/threads_sccz80.lst

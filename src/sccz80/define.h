@@ -54,6 +54,8 @@ typedef enum {
     MODE_CAST
 } decl_mode;
 
+
+
 typedef enum {
     KIND_NONE,
     KIND_VOID,
@@ -66,16 +68,21 @@ typedef enum {
     KIND_ARRAY,
     KIND_PTR,
     KIND_CPTR,
-    KIND_STRUCT, // 11
+    KIND_STRUCT, /* 11 */
     KIND_FUNC,
     KIND_ELLIPSES,
     KIND_PORT8,
     KIND_PORT16,
     KIND_ENUM,
-    KIND_CARRY
+    KIND_CARRY,
+    KIND_FLOAT16,
+    KIND_LONGLONG,
 } Kind;
 
-#define kind_is_integer(k) ( k == KIND_CHAR || k == KIND_INT || k == KIND_SHORT || k == KIND_LONG )
+#define kind_is_floating(x)  ( (x) == KIND_DOUBLE || (x) == KIND_FLOAT16)
+#define kind_is_integer(k) ( k == KIND_CHAR || k == KIND_INT || k == KIND_SHORT || k == KIND_LONG || k == KIND_LONGLONG )
+
+#define get_float_type(k) (k == KIND_DOUBLE || k == KIND_FLOAT) ? type_double : type_float16
 
 typedef struct {
     size_t    size;
@@ -91,9 +98,11 @@ struct type_s {
     Kind      kind;
     int       size;
     char      isunsigned;
+    char      explicitly_signed;  // Set if "signed" in type definition
     char      isconst;
     char      isfar;  // Valid for pointers/array
     char      name[NAMESIZE]; 
+    char     *namespace; // Which namespace is this object in
     
     Type     *ptr;   // For array, or pointer
     int       len;   // Length of the array
@@ -126,14 +135,14 @@ struct type_s {
     UT_hash_handle hh;
 };
 
-extern Type *type_void, *type_carry, *type_char, *type_uchar, *type_int, *type_uint, *type_long, *type_ulong, *type_double;
+extern Type *type_void, *type_carry, *type_char, *type_uchar, *type_int, *type_uint, *type_long, *type_ulong, *type_double, *type_float16, *type_longlong, *type_ulonglong;
 
 
 enum ident_type {
         ID_VARIABLE = 1,
         ID_MACRO,
         ID_GOTOLABEL,
-        ID_ENUM,
+        ID_ENUM
     };
 
 
@@ -143,7 +152,7 @@ enum storage_type {
     EXTERNAL,      /* External to this file */
     EXTERNP,       /* Extern @ */
     LSTATIC,       /* Static to this file */
-    TYPDEF,
+    TYPDEF
 };
 
 
@@ -151,7 +160,7 @@ enum storage_type {
 enum symbol_flags {
         FLAGS_NONE = 0,
     //    UNSIGNED = 1,
-        FARPTR = 0x02,
+    //    FARPTR = 0x02,
         FARACC = 0x04,
         FASTCALL = 0x08,     /* for certain lib calls only */
         CALLEE = 0x40,      /* Called function pops regs */
@@ -162,7 +171,8 @@ enum symbol_flags {
         NAKED = 0x800,      /* Function is naked - don't generate any code */
         CRITICAL = 0x1000,    /* Disable interrupts around the function */
         SDCCDECL = 0x2000,   /* Function uses sdcc convention for chars */
-        SHORTCALL = 0x4000   /* Function uses short call (via rst) */
+        SHORTCALL = 0x4000,   /* Function uses short call (via rst) */
+        BANKED = 0x8000      /* Call via the banked_call function */
 };
 
 
@@ -205,6 +215,15 @@ struct symbol_s {
 };
 
 
+typedef struct namespace_s namespace;
+
+struct namespace_s {
+    char        *name;
+    SYMBOL      *bank_function;
+    namespace   *next;       
+};
+
+
 
 
 
@@ -218,7 +237,7 @@ typedef struct switchtab_s SW_TAB;
 
 struct switchtab_s {
         int label ;             /* label for start of case */
-        int32_t value ;             /* value associated with case */
+        int64_t value ;             /* value associated with case */
 } ;
 
 
@@ -321,27 +340,28 @@ struct gototab_s {
 #define DBG_GOTO  14
 
 #define DBG_FAR1  21
-#define DBG_ALL  99
+#define DBG_ALL   99
 
 #define Z80ASM_PREFIX "_"
 
-
-/* Assembler modes */
-#define ASM_Z80ASM  0
-#define ASM_ASXX    1
-#define ASM_VASM    2
-#define ASM_GNU     3
-
-#define ISASM(x) ( c_assembler_type == (x) )
 
 
 #define CPU_Z80      1
 #define CPU_Z180     2
 #define CPU_R2K      4
 #define CPU_R3K      8
-#define CPU_Z80ZXN   16
+#define CPU_Z80N     16
+#define CPU_8080     32
+#define CPU_8085     34
+#define CPU_GBZ80    128
 
 #define CPU_RABBIT (CPU_R2K|CPU_R3K)
+
+#define IS_8080() (c_cpu == CPU_8080 )
+#define IS_8085() (c_cpu == CPU_8085 )
+#define IS_808x() (c_cpu == CPU_8080 || c_cpu == CPU_8085)
+#define IS_GBZ80() (c_cpu == CPU_GBZ80)
+#define IS_Z80N() (c_cpu == CPU_Z80N)
 
 
 
@@ -367,7 +387,7 @@ struct lvalue_s {
         Kind    indirect_kind;                  /* type of indirect object, 0 for static object */
         int ptr_type ;                  /* type of pointer or array, 0 for other idents */
         int is_const ;                  /* true if constant expression */
-        double const_val ;                        /* value of constant expression (& other uses) */
+        zdouble const_val ;                        /* value of constant expression (& other uses) */
         void (*binop)(LVALUE *lval) ;                /* function address of highest/last binary operator */
         char *stage_add ;               /* stage addess of "oper 0" code, else 0 */
         Type *stage_add_ltype;          /* Type at stage_add being set */
@@ -390,7 +410,8 @@ enum optimisation {
         OPT_SUB32          = (1 << 4),
         OPT_INT_COMPARE    = (1 << 5),
         OPT_LONG_COMPARE   = (1 << 6),
-        OPT_UCHAR_MULT     = (1 << 7)
+        OPT_UCHAR_MULT     = (1 << 7),
+        OPT_DOUBLE_CONST   = (1 << 8)
 };
 
 enum maths_mode {
@@ -400,6 +421,8 @@ enum maths_mode {
     MATHS_MBF40, // 40 bit Microsoft 
     MATHS_MBF64, // 64 bit Microsoft double precision
     MATHS_Z88,   // Special handling for z88 (subtype of MATHS_Z80)
+    MATHS_IEEE16, // Used for _Float16
+    MATHS_AM9511  // AM9511 math processor format
 };
 
 

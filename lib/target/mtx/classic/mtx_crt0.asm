@@ -47,6 +47,14 @@
 	defc	__CPU_CLOCK = 4000000
         INCLUDE "crt/classic/crt_rules.inc"
 
+
+	IF !DEFINED_CLIB_RS232_PORT_B
+	    IF !DEFINED_CLIB_RS232_PORT_A
+                defc DEFINED_CLIB_RS232_PORT_A = 1
+            ENDIF
+        ENDIF
+	INCLUDE	"target/mtx/def/mtxserial.def"
+
         org     CRT_ORG_CODE
 
 
@@ -76,10 +84,8 @@ cleanup:
 ;
         push    hl				; return code
 
-IF CRT_ENABLE_STDIO = 1
-        EXTERN     closeall
-        call    closeall
-ENDIF
+        call    crt0_exit
+
 
 
 cleanup_exit:

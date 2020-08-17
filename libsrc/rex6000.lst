@@ -1,7 +1,3 @@
-@stdio/stdio.lst
-@ctype/ctype.lst
-@stdlib/stdlib.lst
-@strings/string.lst
 target/rex/DsPrintf
 target/rex/DsPrintfe
 target/rex/input8
@@ -44,6 +40,4 @@ target/rex/graphics/DsGetPixelAddr
 target/rex/graphics/DsSetPixel
 target/rex/graphics/DsDisplayCircle
 target/rex/graphics/DsDisplayEllipse
-setjmp/l_longjmp
-setjmp/l_setjmp
-
+@z80.lst

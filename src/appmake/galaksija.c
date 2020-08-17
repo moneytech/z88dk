@@ -3,7 +3,7 @@
  *
  *        Based on the original "bin2gtp" program by Tomaz Solc
  *
- *        $Id: galaksija.c,v 1.7 2016-06-26 00:46:54 aralbrec Exp $
+ *        $Id: galaksija.c $
  */
 
 #include "appmake.h"
@@ -14,16 +14,17 @@ static char             *outfile      = NULL;
 static char             *blockname    = NULL;
 static int               origin       = -1;
 static char              audio        = 0;
-static char              fast       = 0;
+static char              fast         = 0;
+static char              khz_22       = 0;
 static char              dumb         = 0;
 static char              loud         = 0;
 static char              help         = 0;
 
 static char              bit_state    = 0;
-static char              h_lvl;
-static char              l_lvl;
-static char              gal_h_lvl;
-static char              gal_l_lvl;
+static uint8_t           h_lvl;
+static uint8_t           l_lvl;
+static uint8_t           gal_h_lvl;
+static uint8_t           gal_l_lvl;
 
 
 
@@ -35,6 +36,7 @@ option_t gal_options[] = {
     { 'o', "output",   "Name of output file",        OPT_STR,   &outfile },
     {  0,  "audio",    "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",     "Tweak the audio tones to run a bit faster",  OPT_BOOL,  &fast },
+    {  0,  "22",       "22050hz bitrate option",     OPT_BOOL,  &khz_22 },
     {  0,  "dumb",     "Just convert to WAV a tape file",  OPT_BOOL,  &dumb },
     {  0,  "loud",     "Louder audio volume",        OPT_BOOL,  &loud },
     {  0 , "org",      "Origin of the binary",       OPT_INT,   &origin },
@@ -166,7 +168,7 @@ int gal_exec(char* target)
         }
 
         if (blockname == NULL)
-            blockname = binname;
+            blockname = zbasename(binname);
 
 /* Tomaz's code insertion starts here */
 
@@ -178,12 +180,12 @@ int gal_exec(char* target)
 #endif
 
         if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-            myexit("File open error\n", 1);
+            exit_log(1,"File open error\n");
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
         len = ftell(fpin);
         fseek(fpin, 0L, SEEK_SET);
@@ -191,8 +193,7 @@ int gal_exec(char* target)
         datalen = 4 + len + basicdeflen;
 
         if ((fpout = fopen(filename, "wb")) == NULL) {
-            printf("Can't open output file %s\n", filename);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open output file %s\n", filename);
         }
 
         /* **** GTP Header **** */
@@ -245,15 +246,14 @@ int gal_exec(char* target)
     /* ***************************************** */
     /*  Now, if requested, create the audio file */
     /* ***************************************** */
-    if ((audio) || (fast) || (loud)) {
+    if ((audio) || (fast) || (loud) || (khz_22)) {
         if ((fpin = fopen(filename, "rb")) == NULL) {
-            fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open file %s for wave conversion\n", filename);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
         len = ftell(fpin);
         fseek(fpin, 0, SEEK_SET);
@@ -263,8 +263,7 @@ int gal_exec(char* target)
         suffix_change(wavfile, ".RAW");
 
         if ((fpout = fopen(wavfile, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output raw audio file %s\n", wavfile);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open output raw audio file %s\n", wavfile);
         }
 
         /* leading silence and tone*/
@@ -293,7 +292,10 @@ int gal_exec(char* target)
         fclose(fpout);
 
         /* Now complete with the WAV header */
-        raw2wav(wavfile);
+		if (khz_22)
+			raw2wav_22k(wavfile,2);
+		else
+			raw2wav(wavfile);
 
     } /* END of WAV CONVERSION BLOCK */
 

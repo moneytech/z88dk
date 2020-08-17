@@ -2,7 +2,7 @@
 /*
  *      Sorcerer Exidy, MicroBee and Excalibur 64 audio cassette formats
  *      Kansas City Standard (DGOS variants)
- *      
+ *
  *      $Id: sorcerer.c $
  */
 
@@ -18,6 +18,7 @@ static char             *blockname    = NULL;
 static int               origin       = -1;
 static char              audio        = 0;
 static char              fast         = 0;
+static char              khz_22       = 0;
 static char              bps300       = 0;
 static char              bee          = 0;
 static char              excalibur    = 0;
@@ -27,10 +28,10 @@ static char              loud         = 0;
 static char              help         = 0;
 
 static char              bit_state    = 0;
-static char              h_lvl;
-static char              l_lvl;
-static char              sorcerer_h_lvl;
-static char              sorcerer_l_lvl;
+static uint8_t           h_lvl;
+static uint8_t           l_lvl;
+static uint8_t           sorcerer_h_lvl;
+static uint8_t           sorcerer_l_lvl;
 
 static unsigned char     parity;
 
@@ -43,6 +44,7 @@ option_t sorcerer_options[] = {
     { 'o', "output",    "Name of output file",        OPT_STR,   &outfile },
     {  0,  "audio",     "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",      "Tweak the audio tones to run a bit faster",  OPT_BOOL,  &fast },
+    {  0,  "22",        "22050hz bitrate option",     OPT_BOOL,  &khz_22 },
     {  0,  "300bps",    "300 baud mode instead than 1200",  OPT_BOOL,  &bps300 },
     {  0,  "bee",       "MicroBee type header",       OPT_BOOL,  &bee },
     {  0,  "excalibur", "Excalibur64 type header",    OPT_BOOL,  &excalibur },
@@ -220,30 +222,27 @@ int sorcerer_exec(char* target)
         }
 
         if (blockname == NULL)
-            blockname = binname;
+            blockname = zbasename(binname);
 
         if (strcmp(binname, filename) == 0) {
-            fprintf(stderr, "Input and output file names must be different\n");
-            myexit(NULL, 1);
+            exit_log(1, "Input and output file names must be different\n");
         }
 
         if (origin != -1) {
             pos = origin;
         } else {
             if ((pos = get_org_addr(crtfile)) == -1) {
-                myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+                exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
             }
         }
 
         if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-            fprintf(stderr, "Can't open input file %s\n", binname);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open input file %s\n", binname);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
-            fprintf(stderr, "Couldn't determine size of file\n");
             fclose(fpin);
-            myexit(NULL, 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
 
         len = ftell(fpin);
@@ -252,7 +251,7 @@ int sorcerer_exec(char* target)
 
         if ((fpout = fopen(filename, "wb")) == NULL) {
             fclose(fpin);
-            myexit("Can't open output file\n", 1);
+            exit_log(1,"Can't open output file\n");
         }
 
         /* HEADER */
@@ -260,23 +259,18 @@ int sorcerer_exec(char* target)
         /* Leader (DGOS' standard padding sequence) */
         for (i = 0; (i < leadinlength); i++)
             writebyte_pk(0, fpout, &parity);
-		
+
 		/* leading SOH */
         if (excalibur)
 			writebyte_pk(0xa5, fpout, &parity);
 		else
 			writebyte_pk(1, fpout, &parity);
-		
+
         parity = 0;
 
         /* Deal with the filename */
-        if (strlen(blockname) >= 6) {
-            strncpy(name, blockname, 6);
-        } else {
-            strcpy(name, blockname);
-            strncat(name, "      ", 6 - strlen(blockname));
-        }
-		
+        snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, blockname);
+
         if (excalibur) {
 			writebyte_pk(0x2f, fpout, &parity); /* File type (0x2f for M/C block, 0xd3 for BASIC program) */
 			writebyte_pk(0x2f, fpout, &parity); /* File type (0x2f for M/C block, 0xd3 for BASIC program) */
@@ -306,8 +300,7 @@ int sorcerer_exec(char* target)
 			writeword_pk(len, fpout, &parity); /* Program File Length */
 			writeword_pk(pos, fpout, &parity); /* Program Location */
 			writeword_pk(pos, fpout, &parity); /* GO Address: pos for autorun when LOADG (Sorcerer) / or LOADM (MicroBee w/FL_EXEC set to 0xff) */
-			
-			
+
 			if (bee) {
 				if (!bps300) {
 					bee1200 = 1; /* Speed (MicroBee at 1200 bps) */
@@ -359,15 +352,14 @@ int sorcerer_exec(char* target)
     /* ***************************************** */
     /*  Now, if requested, create the audio file */
     /* ***************************************** */
-    if ((audio) || (bps300) || (loud)) {
+    if ((audio) || (fast) || (bps300) || (khz_22) || (loud)) {
         if ((fpin = fopen(filename, "rb")) == NULL) {
-            fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open file %s for wave conversion\n", filename);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
         len = ftell(fpin);
         fseek(fpin, 0, SEEK_SET);
@@ -377,8 +369,7 @@ int sorcerer_exec(char* target)
         suffix_change(wavfile, ".RAW");
 
         if ((fpout = fopen(wavfile, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output raw audio file %s\n", wavfile);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open output raw audio file %s\n", wavfile);
         }
 
         /* leading silence and tone*/
@@ -389,13 +380,15 @@ int sorcerer_exec(char* target)
         /* Copy the header */
         if (dumb)
 			printf("\nInfo: Program Name found in header: ");
-				
+
+        j = 0;          // Prevent warning "may be used uninitialized"
+
 		for (i = 0; (i < (leadinlength + 18)); i++) {
 			c = getc(fpin);
 			if (dumb) {
 				if (excalibur) {
 					if (i > (leadinlength+3) && i < (leadinlength + 6))
-						printf("%c", c);					
+						printf("%c", c);
 					if ((i == (leadinlength + 7) || i == (leadinlength + 9)))
 						j = c;
 					if (i == (leadinlength + 8))
@@ -421,7 +414,7 @@ int sorcerer_exec(char* target)
 		}
 
 		len = len - 18 - leadinlength;
-		
+
         if ((bee) && (bee1200))
             bps300 = 0;
 
@@ -447,7 +440,10 @@ int sorcerer_exec(char* target)
         fclose(fpout);
 
         /* Now complete with the WAV header */
-        raw2wav(wavfile);
+		if (khz_22)
+			raw2wav_22k(wavfile,2);
+		else
+			raw2wav(wavfile);
 
     } /* END of WAV CONVERSION BLOCK */
 

@@ -47,11 +47,18 @@
 	defc	__CPU_CLOCK = 4000000
         INCLUDE "crt/classic/crt_rules.inc"
 
-IF (startup=2)
-        org     32768
-ELSE
-        org     $100
-ENDIF
+	IF (startup=2)
+		IF !DEFINED_CRT_ORG_CODE
+            defc    CRT_ORG_CODE  = 32768
+		ENDIF
+	ELSE
+		IF !DEFINED_CRT_ORG_CODE
+            defc    CRT_ORG_CODE  = $100
+		ENDIF
+	ENDIF
+
+	org     CRT_ORG_CODE
+
 
 ;----------------------
 ; Execution starts here
@@ -94,20 +101,22 @@ ENDIF
 IF (startup=2)
 	;EXTERN ASMTAIL
 		ld	hl,$100
-		ld  de,32768
+		ld  de,CRT_ORG_CODE
 		ld  bc,$4000-$100	; max. code size is about 16K
 		ldir
 IF !DEFINED_noprotectmsdos
-		jp  32768+14
+		jp  CRT_ORG_CODE+14
 ELSE
-		jp  32768+14-start+begin
+		jp  CRT_ORG_CODE+14-start+begin
 ENDIF
 ENDIF
 
 	nop	 ;   Those extra bytes fix the Amstrad NC's ZCN support !!?!
 	nop
 
-	ld      (start1+1),sp	;Save entry stack
+        ld	hl,0
+	add	hl,sp
+	ld      (start1+1),hl	;Save entry stack
 IF (startup=3)
 	; Increase to cover +3 MEM banking
 	defc	__clib_exit_stack_size_t  = __clib_exit_stack_size + 18 + 18
@@ -118,7 +127,9 @@ ENDIF
         INCLUDE "crt/classic/crt_init_atexit.asm"
         call    crt0_init_bss   
 	call	cpm_platform_init	;Any platform specific init
-	ld      (exitsp),sp
+	ld	hl,0
+	add	hl,sp
+	ld      (exitsp),hl
 
 ; Memory banking for Spectrum +3
 IF (startup=3)
@@ -154,6 +165,7 @@ ENDIF
         ld      b,0
         and     a
         jr      z,argv_done
+	inc	hl
         ld      c,a
         add     hl,bc   ;now points to the end of the command line
 
@@ -172,10 +184,8 @@ ENDIF
 
 cleanup:
 	push	hl		;Save return value
-IF CRT_ENABLE_STDIO = 1
-	EXTERN	closeall	;Close any opened files
-	call	closeall
-ENDIF
+    call    crt0_exit
+
 	pop	bc		;Get exit() value into bc
 start1:	ld      sp,0		;Pick up entry sp
         jp	0
@@ -260,7 +270,7 @@ defltdsk:       defb    0	;Default disc
 
 IF !DEFINED_nofileio
 		PUBLIC	__fcb
-__fcb:		defs	420,0	;file control block (10 files) (MAXFILE)
+__fcb:		defs	430,0	;file control block (10 files) (MAXFILE)
 ENDIF
 
 

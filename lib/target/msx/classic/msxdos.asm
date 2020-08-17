@@ -61,6 +61,7 @@ ENDIF
         and     a
         jr      z,argv_done
         ld      c,a
+	inc	hl
         add     hl,bc   ;now points to the end of the command line
 	INCLUDE	"crt/classic/crt_command_line.asm"
 
@@ -75,10 +76,8 @@ cleanup:
 ;       Deallocate memory which has been allocated here!
 ;
 
-IF CRT_ENABLE_STDIO = 1
-	EXTERN	closeall
-	call	closeall
-ENDIF
+    call    crt0_exit
+
 
 start1:
 	ld	sp,0

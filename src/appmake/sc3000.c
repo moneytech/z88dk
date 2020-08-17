@@ -18,10 +18,11 @@ static int               origin       = -1;
 static char              help         = 0;
 static char              audio        = 0;
 static char              fast         = 0;
+static char              khz_22       = 0;
 static char              survivors    = 0;
 static char              sf7000       = 0;
 
-unsigned long            checksum;
+static unsigned long     checksum;
 
 
 /* Options that are available for this module */
@@ -32,6 +33,7 @@ option_t sc3000_options[] = {
     { 'o', "output",   "Name of output file",        OPT_STR,   &outfile },
     {  0,  "audio",    "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",     "Create a fast loading WAV",  OPT_BOOL,  &fast },
+    {  0,  "22",       "22050hz bitrate option",     OPT_BOOL,  &khz_22 },
     {  0,  "survivors", "Add an 'SC Survivors' flash player file", OPT_BOOL,  &survivors },
     {  0 , "org",      "Origin of the binary (CLOADM only)",       OPT_INT,   &origin },
     {  0,  "sf7000",    "Simpler CLOADM format for SF-7000 only",  OPT_BOOL,  &sf7000 },
@@ -110,7 +112,7 @@ int sc3000_exec(char* target)
     char wavfile[FILENAME_MAX + 1];
     char name[17];
     FILE *fpin, *fpout;
-    long pos, blocklen;
+    long pos=0, blocklen;
     int c, i, len;
 
     if (help)
@@ -128,20 +130,19 @@ int sc3000_exec(char* target)
     }
 
     if (blockname == NULL)
-        blockname = binname;
+        blockname = zbasename(binname);
 
     if (origin != -1) {
         pos = origin;
     } else {
         if (!sf7000)
             if ((pos = get_org_addr(crtfile)) == -1) {
-                myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+                exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
             }
     }
 
     if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-        fprintf(stderr, "Can't open input file %s\n", binname);
-        myexit(NULL, 1);
+        exit_log(1,"Can't open input file %s\n", binname);
     }
 
     /*
@@ -150,15 +151,14 @@ int sc3000_exec(char* target)
  */
     if (fseek(fpin, 0, SEEK_END)) {
         fclose(fpin);
-        myexit("Couldn't determine size of file\n", 1);
+        exit_log(1,"Couldn't determine size of file\n");
     }
 
     len = ftell(fpin);
     fseek(fpin, 0, SEEK_SET);
 
     if ((fpout = fopen(filename, "wb")) == NULL) {
-        fprintf(stderr, "Can't open output file %s\n", filename);
-        myexit(NULL, 1);
+        exit_log(1, "Can't open output file %s\n", filename);
     }
 
     /* Write out the .tap file */
@@ -171,12 +171,9 @@ int sc3000_exec(char* target)
 
         /* Deal with the filename */
         checksum = 255;
-        if (strlen(blockname) >= 16) {
-            strncpy(name, blockname, 16);
-        } else {
-            strcpy(name, blockname);
-            strncat(name, "                ", 16 - strlen(blockname));
-        }
+
+        snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, blockname);
+
         for (i = 0; i <= 15; i++)
             writebyte_cksum(name[i], fpout, &checksum);
 
@@ -217,12 +214,9 @@ int sc3000_exec(char* target)
 
         /* Deal with the filename */
         checksum = 255;
-        if (strlen(blockname) >= 16) {
-            strncpy(name, blockname, 16);
-        } else {
-            strcpy(name, blockname);
-            strncat(name, "                ", 16 - strlen(blockname));
-        }
+
+        snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, blockname);
+
         for (i = 0; i <= 15; i++)
             writebyte_cksum(name[i], fpout, &checksum);
 
@@ -291,15 +285,14 @@ int sc3000_exec(char* target)
     /* ***************************************** */
     /*  Now, if requested, create the audio file */
     /* ***************************************** */
-    if ((audio) || (fast)) {
+    if ((audio) || (fast) || (khz_22)) {
         if ((fpin = fopen(filename, "rb")) == NULL) {
-            fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open file %s for wave conversion\n", filename);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
         len = ftell(fpin);
         fseek(fpin, 0, SEEK_SET);
@@ -312,8 +305,7 @@ int sc3000_exec(char* target)
             suffix_change(wavfile, ".RAW");
 
         if ((fpout = fopen(wavfile, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output raw audio file %s\n", wavfile);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open output raw audio file %s\n", wavfile);
         }
 
         /* leading silence */
@@ -352,8 +344,12 @@ int sc3000_exec(char* target)
         fclose(fpout);
 
         /* Now complete with the WAV header */
-        if (!survivors)
-            raw2wav(wavfile);
+        if (!survivors) {
+			if (khz_22)
+				raw2wav_22k(wavfile,2);
+			else
+				raw2wav(wavfile);
+		}
     }
 
     exit(0);

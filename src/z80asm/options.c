@@ -1,35 +1,33 @@
 //-----------------------------------------------------------------------------
 // Z88DK Z80 Module Assembler
 // Parse command line options
-// Copyright (C) Paulo Custodio, 2011-2018
+// Copyright (C) Paulo Custodio, 2011-2020
 // License: http://www.perlfoundation.org/artistic_license_2_0
 //-----------------------------------------------------------------------------
 
 #include "../config.h"
 #include "../portability.h"
-
+#include "die.h"
 #include "errors.h"
 #include "fileutil.h"
 #include "hist.h"
 #include "init.h"
 #include "model.h"
+#include "modlink.h"        /* Prevent warning: implicit declaration of function ‘library_file_append’ */
 #include "options.h"
 #include "srcfile.h"
 #include "str.h"
 #include "strutil.h"
 #include "symtab.h"
 #include "utarray.h"
+#include "utstring.h"
 #include "z80asm.h"
-#include "die.h"
+#include "zutils.h"
 
 #include <ctype.h>
 #include <errno.h>
 #include <limits.h>
 #include <string.h>
-
-#ifdef _MSC_VER
-#define snprintf _snprintf
-#endif
 
 /* default file name extensions */
 #define FILEEXT_ASM     ".asm"    
@@ -59,8 +57,11 @@ static void option_define(const char *symbol );
 static void option_make_lib(const char *library );
 static void option_use_lib(const char *library );
 static void option_cpu_z80(void);
-static void option_cpu_z80_zxn(void);
+static void option_cpu_z80n(void);
 static void option_cpu_z180(void);
+static void option_cpu_gbz80(void);
+static void option_cpu_8080(void);
+static void option_cpu_8085(void);
 static void option_cpu_r2k(void);
 static void option_cpu_r3k(void);
 static void option_cpu_ti83(void);
@@ -164,8 +165,8 @@ void parse_argv( int argc, char *argv[] )
 
     init_module();
 
-    if ( argc == 1 )
-        exit_copyright();					/* exit if no arguments */
+	if ( argc == 1 )
+		exit_copyright();					/* exit if no arguments */
 
 	if (!get_num_errors())
 		process_env_options();				/* process options from Z80ASM environment variable */
@@ -177,7 +178,7 @@ void parse_argv( int argc, char *argv[] )
 		error_no_src_file();				/* no source file */
 
 	if ( ! get_num_errors() )
-        process_files( arg, argc, argv );	/* process each source file */
+		process_files( arg, argc, argv );	/* process each source file */
 
 	make_output_dir();						/* create output directory if needed */
 	include_z80asm_lib();					/* search for z80asm-*.lib, append to library path */
@@ -212,12 +213,24 @@ static void process_opt( int *parg, int argc, char *argv[] )
 	const char *opt_arg_ptr;
 
 	/* search options that are exceptions to the look-up table */
-	if (strcmp(argv[II], "-mz80-zxn") == 0 || strcmp(argv[II], "-m=z80-zxn") == 0) {
-		option_cpu_z80_zxn();
+	if (strcmp(argv[II], "-mz80n") == 0 || strcmp(argv[II], "-m=z80n") == 0) {
+		option_cpu_z80n();
 		return;
 	}
 	else if (strcmp(argv[II], "-mz80") == 0 || strcmp(argv[II], "-m=z80") == 0) {
 		option_cpu_z80();
+		return;
+	}
+	else if (strcmp(argv[II], "-mgbz80") == 0 || strcmp(argv[II], "-m=gbz80") == 0) {
+		option_cpu_gbz80();
+		return;
+	}
+	else if (strcmp(argv[II], "-m8080") == 0 || strcmp(argv[II], "-m=8080") == 0) {
+		option_cpu_8080();
+		return;
+	}
+	else if (strcmp(argv[II], "-m8085") == 0 || strcmp(argv[II], "-m=8085") == 0) {
+		option_cpu_8085();
 		return;
 	}
 	else if (strcmp(argv[II], "-mz180") == 0 || strcmp(argv[II], "-m=z180") == 0) {
@@ -238,6 +251,18 @@ static void process_opt( int *parg, int argc, char *argv[] )
 	}
 	else if (strcmp(argv[II], "-mti83plus") == 0 || strcmp(argv[II], "-m=ti83plus") == 0) {
 		option_cpu_ti83plus();
+		return;
+	}
+	else if (strncmp(argv[II], "-l", 2) == 0 && argv[II][2] != '\0') {
+		library_file_append(&argv[II][2]);
+		return;
+	}
+	else if (strcmp(argv[II], "-l") == 0) {
+		opts.list = true;
+		return;
+	}
+	else if (strcmp(argv[II], "-reloc-info") == 0) {
+		opts.reloc_info = true;
 		return;
 	}
 	else {
@@ -370,7 +395,7 @@ static const char *search_source(const char *filename)
 
 static void process_file(char *filename )
 {
-	cstr_strip(filename);
+	strstrip(filename);
 	switch (filename[0])
 	{
 	case '\0':		/* no file */
@@ -378,7 +403,7 @@ static void process_file(char *filename )
 
 	case '@':		/* file list */
 		filename++;						/* point to after '@' */
-		cstr_strip(filename);
+		strstrip(filename);
 		filename = (char *)expand_environment_variables(filename);
 		expand_list_glob(filename);
 		break;
@@ -589,7 +614,7 @@ static void show_option( enum OptType type, bool *pflag,
 
     if ( *help_arg )
     {
-        Str_append_sprintf( msg, "=%s", help_arg );
+        Str_append_sprintf( msg, "%s", help_arg );
     }
 
     if ( Str_len(msg) > ALIGN_HELP )
@@ -648,7 +673,10 @@ int number_arg(const char *arg)
 	int radix;
 	char suffix = '\0';
 	
-	if (p[0] == '$') {
+	if (p[0] == '\0') {		// empty
+		return -1;
+	}
+	else if (p[0] == '$') {
 		p++;
 		radix = 16;
 	}
@@ -700,22 +728,31 @@ static void option_define(const char *symbol )
     int i;
 
     /* check syntax - BUG_0045 */
-    if ( (! isalpha( symbol[0] )) && (symbol[0] != '_') )
-    {
-        error_illegal_ident();
-        return;
-    }
+	if (!isalpha(symbol[0]) && symbol[0] != '_') {
+		error_illegal_ident();
+		return;
+	}
 
-    for ( i = 1; symbol[i]; i++ )
-    {
-        if ( ! isalnum( symbol[i] ) && symbol[i] != '_' )
-        {
-            error_illegal_ident();
-            return;
-        }
-    }
+	for (i = 1; symbol[i] != 0 && symbol[i] != '='; i++) {
+		if (!isalnum(symbol[i]) && symbol[i] != '_') {
+			error_illegal_ident();
+			return;
+		}
+	}
 
-    define_static_def_sym( symbol, 1 );
+	if (symbol[i] != '=') {		// -Dvar
+		define_static_def_sym(symbol, 1);
+	}
+	else {						// -Dvar=nn
+		char* variable = xstrdup(symbol);
+		variable[i] = '\0';		// truncate after variable name
+		int value = number_arg(symbol + i + 1);
+		if (value < 0)
+			error_invalid_define_option(symbol);
+		else
+			define_static_def_sym(variable, value);
+		xfree(variable);
+	}
 }
 
 static void option_make_lib(const char *library )
@@ -723,9 +760,8 @@ static void option_make_lib(const char *library )
     opts.lib_file = library;		/* may be empty string */
 }
 
-static void option_use_lib(const char *library )
-{
-    GetLibfile( library );
+static void option_use_lib(const char *library) {
+	library_file_append(library);
 }
 
 static void option_cpu_z80(void)
@@ -734,10 +770,28 @@ static void option_cpu_z80(void)
 	opts.cpu_name = CPU_Z80_NAME;
 }
 
-static void option_cpu_z80_zxn(void)
+static void option_cpu_z80n(void)
 {
-	opts.cpu = CPU_Z80_ZXN;
-	opts.cpu_name = CPU_Z80_ZXN_NAME;
+	opts.cpu = CPU_Z80N;
+	opts.cpu_name = CPU_Z80N_NAME;
+}
+
+static void option_cpu_gbz80(void)
+{
+	opts.cpu = CPU_GBZ80;
+	opts.cpu_name = CPU_GBZ80_NAME;
+}
+
+static void option_cpu_8080(void)
+{
+	opts.cpu = CPU_8080;
+	opts.cpu_name = CPU_8080_NAME;
+}
+
+static void option_cpu_8085(void)
+{
+	opts.cpu = CPU_8085;
+	opts.cpu_name = CPU_8085_NAME;
 }
 
 static void option_cpu_z180(void)
@@ -775,18 +829,34 @@ static void define_assembly_defines()
 	switch (opts.cpu) {
 	case CPU_Z80:
 	    define_static_def_sym("__CPU_Z80__", 1);
+	    define_static_def_sym("__CPU_ZILOG__", 1);
 		break;
-	case CPU_Z80_ZXN:
-	    define_static_def_sym("__CPU_Z80_ZXN__", 1);
+	case CPU_Z80N:
+	    define_static_def_sym("__CPU_Z80N__", 1);
+	    define_static_def_sym("__CPU_ZILOG__", 1);
 		break;
 	case CPU_Z180:
 	    define_static_def_sym("__CPU_Z180__", 1);
+	    define_static_def_sym("__CPU_ZILOG__", 1);
 		break;
 	case CPU_R2K:
 	    define_static_def_sym("__CPU_R2K__", 1);
+	    define_static_def_sym("__CPU_RABBIT__", 1);
 		break;
 	case CPU_R3K:
 	    define_static_def_sym("__CPU_R3K__", 1);
+	    define_static_def_sym("__CPU_RABBIT__", 1);
+		break;
+	case CPU_8080:
+	    define_static_def_sym("__CPU_8080__", 1);
+	    define_static_def_sym("__CPU_INTEL__", 1);
+		break;
+	case CPU_8085:
+	    define_static_def_sym("__CPU_8085__", 1);
+	    define_static_def_sym("__CPU_INTEL__", 1);
+		break;
+	case CPU_GBZ80:
+		define_static_def_sym("__CPU_GBZ80__", 1);
 		break;
 	default:
 		xassert(0);

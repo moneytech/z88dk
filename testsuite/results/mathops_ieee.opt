@@ -24,9 +24,10 @@
 	push	bc
 	ld	hl,0	;const
 	add	hl,sp
-	ld	(hl),+(0 % 256)
+	xor	a
+	ld	(hl),a
 	inc	hl
-	ld	(hl),+(0 / 256)
+	ld	(hl),a
 	inc	hl
 	ld	(hl),+(16416 % 256)
 	inc	hl
@@ -229,6 +230,15 @@
 
 
 
+._inverse
+	ld	hl,2	;const
+	add	hl,sp
+	call	l_glong
+	call	l_f32_invf
+	ret
+
+
+
 ._cschar
 	ld	hl,2	;const
 	add	hl,sp
@@ -310,6 +320,7 @@
 	GLOBAL	_gt
 	GLOBAL	_ge
 	GLOBAL	_neg
+	GLOBAL	_inverse
 	GLOBAL	_cschar
 	GLOBAL	_cuchar
 	GLOBAL	_csint

@@ -3,7 +3,7 @@
 #-----------------------------------------------------------------------------
 # Z88DK Z80 Macro Assembler
 #
-# Copyright (C) Paulo Custodio, 2011-2018
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: http://www.perlfoundation.org/artistic_license_2_0
 #
 # BUG_0049: Making a library with -d and 512 (win32) object files fails
@@ -56,7 +56,7 @@ ok -f 'test.lib';
 
 # use library
 unlink 'test.bin';
-z80asm(<<'END', '-b -itest');
+z80asm(<<'END', '-b -ltest');
 	extern lbl1234;
 	defw lbl1234;
 END

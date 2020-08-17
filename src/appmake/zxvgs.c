@@ -44,7 +44,6 @@ int zxvgs_exec(char* target)
     int readlen; /* Amount read in */
     unsigned int chunk; /* chunk size */
     char name[FILENAME_MAX + 1];
-    char buffer[LINEMAX + 1];
     char header[5]; /* header to save */
     unsigned char* position;
 
@@ -60,25 +59,25 @@ int zxvgs_exec(char* target)
 
     zorg = get_org_addr(crtfile);
     if (zorg == -1)
-        myexit("Could not find parameter ZORG (compiled as BASIC?)\n", 1);
+        exit_log(1,"Could not find parameter ZORG (compiled as BASIC?)\n");
 
     memory = calloc(1, 49152L);
     if (memory == NULL)
-        myexit("Can't allocate memory\n", 1);
+        exit_log(1,"Can't allocate memory\n");
 
     binfile = fopen_bin(binname, crtfile);
     if (binfile == NULL)
-        myexit("Can't open binary file\n", 1);
+        exit_log(1,"Can't open binary file\n");
 
     if (fseek(binfile, 0, SEEK_END)) {
         fclose(binfile);
-        myexit("Couldn't determine the size of the file\n", 1);
+        exit_log(1,"Couldn't determine the size of the file\n");
     }
 
     filesize = ftell(binfile);
     if (filesize > 49152L) {
         fclose(binfile);
-        myexit("The source binary is over 49152 bytes in length.\n", 1);
+        exit_log(1,"The source binary is over 49152 bytes in length.\n");
     }
 
     fseek(binfile, 0, SEEK_SET);
@@ -86,7 +85,7 @@ int zxvgs_exec(char* target)
     readlen = fread(memory, 1, filesize, binfile);
     if (filesize != readlen) {
         fclose(binfile);
-        myexit("Couldn't read in binary file\n", 1);
+        exit_log(1,"Couldn't read in binary file\n");
     }
     fclose(binfile);
 
@@ -94,24 +93,22 @@ int zxvgs_exec(char* target)
     suffix_change(name, ".V00");
 
     if ((fp = fopen(name, "wb")) == NULL) {
-        sprintf(buffer, "Can't open output file %s\n", name);
-        myexit(buffer, 1);
+        exit_log(1,"Can't open output file %s\n", name);
     }
-    sprintf(buffer, "Can't write to output file %s\n", name);
     header[0] = 1;
     header[1] = zorg / 256;
     header[2] = zorg % 256;
     if (fwrite(&header, 1, 3, fp) != 3)
-        myexit(buffer, 1);
+        exit_log(1, "Can't write to output file %s\n", name);
     position = memory;
     while (filesize > 0) { /* Writing chunk with no compression */
         chunk = (filesize > MAX_CHUNK) ? MAX_CHUNK : filesize;
         header[0] = 0xC0 + chunk / 256;
         header[1] = chunk % 256;
         if (fwrite(&header, 1, 2, fp) != 2)
-            myexit(buffer, 1);
+            exit_log(1, "Can't write to output file %s\n", name);
         if (fwrite(position, 1, chunk, fp) != chunk)
-            myexit(buffer, 1);
+            exit_log(1, "Can't write to output file %s\n", name);
         position += chunk;
         filesize -= chunk;
     }
@@ -119,7 +116,7 @@ int zxvgs_exec(char* target)
     header[1] = zorg / 256;
     header[2] = zorg % 256;
     if (fwrite(&header, 1, 3, fp) != 3)
-        myexit(buffer, 1);
+        exit_log(1, "Can't write to output file %s\n", name);
     fclose(fp);
 
     return 0;

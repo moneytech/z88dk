@@ -3,7 +3,7 @@
 # Z88DK Z80 Macro Assembler
 #
 # Copyright (C) Gunther Strube, InterLogic 1993-99
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
 # Repository: https://github.com/z88dk/z88dk/
 #
@@ -29,7 +29,7 @@ END
 
 run("z80asm -otestx.o test1.asm test2.asm");
 z80nm("testx.o", <<'END');
-Object  file testx.o at $0000: Z80RMF12
+Object  file testx.o at $0000: Z80RMF14
   Name: testx
   Section "": 1 bytes
     C $0000: C9

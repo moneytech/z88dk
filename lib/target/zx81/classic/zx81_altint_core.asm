@@ -10,6 +10,7 @@
 PUBLIC	MTCH_P1
 PUBLIC	MTCH_P2
 PUBLIC	MTCH_P3
+PUBLIC	L0229
 PUBLIC	L0292
 PUBLIC	G007_P1
 PUBLIC	G007_P2
@@ -119,7 +120,7 @@ L028F:  JP      L0229           ; to DISPLAY-1
 ; ---
 
 ;; DISPLAY-3
-L0292:  POP     IY              ; return address to IX register (--IXIY swap).
+L0292:  POP     IY              ; return address to IX register (-IXIY swap).
                                 ; will be either L0281 or L028F - see above.
 ; Modified here to keep IY unchanged
 

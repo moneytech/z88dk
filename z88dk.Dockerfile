@@ -14,7 +14,7 @@ LABEL Version="0.8" \
 ENV Z88DK_PATH="/opt/z88dk" \
     SDCC_PATH="/tmp/sdcc"
 
-RUN apk add --no-cache build-base libxml2 m4 \ 
+RUN apk add --no-cache build-base libxml2 m4 \
     && apk add --no-cache -t .build_deps bison flex libxml2-dev git subversion boost-dev texinfo \
     && git clone --depth 1 --recursive https://github.com/z88dk/z88dk.git ${Z88DK_PATH}
 
@@ -25,17 +25,6 @@ RUN apk add --no-cache build-base libxml2 m4 \
 RUN cd ${Z88DK_PATH} \
     && chmod 777 build.sh \
     && ./build.sh \
-    && svn checkout -r 10892 svn://svn.code.sf.net/p/sdcc/code/trunk/sdcc ${SDCC_PATH} \
-    && cd ${SDCC_PATH} \
-    && patch -p0 < ${Z88DK_PATH}/src/zsdcc/sdcc-z88dk.patch \
-    && ./configure --disable-mcs51-port --disable-gbz80-port --disable-avr-port --disable-ds390-port \
-                   --disable-ds400-port --disable-hc08-port --disable-pic-port --disable-pic14-port \
-                   --disable-pic16-port --disable-stm8-port --disable-tlcs90-port --disable-s08-port \
-                   --disable-ucsim --disable-device-lib --disable-packihx \
-    && make \
-    && mv ./bin/sdcc ${Z88DK_PATH}/bin/zsdcc \
-    && mv ./bin/sdcpp ${Z88DK_PATH}/bin/zsdcpp \
-    && cd / \
     && rm -fR ${SDCC_PATH} \
     && apk del .build_deps
 

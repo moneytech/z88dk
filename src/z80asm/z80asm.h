@@ -2,9 +2,9 @@
 Z88DK Z80 Macro Assembler
 
 Copyright (C) Gunther Strube, InterLogic 1993-99
-Copyright (C) Paulo Custodio, 2011-2017
+Copyright (C) Paulo Custodio, 2011-2020
 License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
-Repository: https://github.com/pauloscustodio/z88dk-z80asm
+Repository: https://github.com/z88dk/z88dk
 */
 
 #pragma once
@@ -22,8 +22,6 @@ Repository: https://github.com/pauloscustodio/z88dk-z80asm
 #endif
 
 extern size_t sizeof_relocroutine, sizeof_reloctable;
-
-extern const char *GetLibfile(const char *filename );
 
 extern void assemble_file( const char *filename );
 extern bool Pass2info(range_t range);

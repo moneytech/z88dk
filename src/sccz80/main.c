@@ -23,6 +23,8 @@ static int      saveline;    /* copy of lineno  "    " */
 static int      saveinfn;    /* copy of infunc  "    " */
 static int      filenum; /* next argument to be used */
 
+static Type *type_double4 = &(Type){ KIND_DOUBLE, 4, 0, .len=1 }; 
+static Type *type_double8 = &(Type){ KIND_DOUBLE, 8, 0, .len=1 }; 
 
 char Filenorig[FILENAME_LEN + 1];
 
@@ -33,6 +35,8 @@ int c_disable_builtins = 0;
 int c_line_labels = 0;
 int c_cline_directive = 0;
 int c_cpu = CPU_Z80;
+int c_old_diagnostic_fmt = 0;
+char *c_zcc_opt = "zcc_opt.def";
 
 /* Settings for genmath + math48 */
 int c_fp_mantissa_bytes = 5;
@@ -61,14 +65,17 @@ char *c_init_section = "code_crt_init";
 #define OPT_HEADER       128
 
 
-typedef struct {
+typedef struct option_s option;
+
+struct option_s {
     const char     short_name;
     const char    *long_name;
     int            type;
     const char    *description;
     void          *value;
+    void         (*func)(option *arg, char *val);
     intptr_t       data;
-} option;
+};
 
 
 static void dumpfns(void);
@@ -81,7 +88,6 @@ static void info(void);
 static void openout(void);
 
 static int parse_arguments(option *args, int argc, char **argv);
-static void SetAssembler(option *arg, char* val);
 static void SetWarning(option *arg, char* val);
 static void SetDefine(option *arg, char *val);
 static void SetUndefine(option *arg, char *val);
@@ -91,63 +97,68 @@ static void atexit_deallocate(void);
 
 
 static option  sccz80_opts[] = {
-    { 'v', "verbose", OPT_BOOL, "Be verbose", &c_verbose, 0 },
-    { 'h', "help", OPT_FUNCTION|OPT_BOOL, "Show this help page", DispInfo, 0 },
-    { 'o', "output", OPT_STRING, "Set the output filename", &c_output_file, 0 },
-    { 0, "", OPT_HEADER, "CPU Targetting:", NULL, 0 },
-    { 0, "mz80-zxn", OPT_ASSIGN|OPT_INT, "Generate output for the z80-zxn", &c_cpu, CPU_Z80ZXN },
-    { 0, "mz80", OPT_ASSIGN|OPT_INT, "Generate output for the z80", &c_cpu, CPU_Z80 },
-    { 0, "mz180", OPT_ASSIGN|OPT_INT, "Generate output for the z180", &c_cpu, CPU_Z180 },
-    { 0, "mr2k", OPT_ASSIGN|OPT_INT, "Generate output for the Rabbit 2000", &c_cpu, CPU_R2K },
-    { 0, "mr3k", OPT_ASSIGN|OPT_INT, "Generate output for the Rabbit 3000", &c_cpu, CPU_R3K },
-    { 0, "", OPT_HEADER, "Code generation options", NULL, 0 },
-    { 0, "unsigned", OPT_BOOL, "Make all types unsigned", &c_default_unsigned, 0 },
-    { 0, "disable-builtins", OPT_BOOL, "Disable builtin functions",&c_disable_builtins, 0},
-    { 0, "doublestr", OPT_BOOL, "Store FP constants as strings", &c_double_strings, 0 },
-    { 0, "math-z88", OPT_ASSIGN|OPT_INT, "(deprecated) Make FP constants match z88", &c_maths_mode, MATHS_Z88 },
+    { 'v', "verbose", OPT_BOOL, "Be verbose", &c_verbose, NULL, 0 },
+    { 'h', "help", OPT_FUNCTION|OPT_BOOL, "Show this help page", NULL, DispInfo, 0 },
+    { 'o', "output", OPT_STRING, "Set the output filename", &c_output_file, NULL, 0 },
+    { 0, "", OPT_HEADER, "CPU Targetting:", NULL, NULL, 0 },
+    { 0, "m8080", OPT_ASSIGN|OPT_INT, "Generate output for the i8080", &c_cpu, NULL, CPU_8080 },
+    { 0, "m8085", OPT_ASSIGN|OPT_INT, "Generate output for the i8085", &c_cpu, NULL, CPU_8085 },
+    { 0, "mz80", OPT_ASSIGN|OPT_INT, "Generate output for the z80", &c_cpu, NULL, CPU_Z80 },
+    { 0, "mz80n", OPT_ASSIGN|OPT_INT, "Generate output for the z80n", &c_cpu, NULL, CPU_Z80N },
+    { 0, "mz180", OPT_ASSIGN|OPT_INT, "Generate output for the z180", &c_cpu, NULL, CPU_Z180 },
+    { 0, "mr2k", OPT_ASSIGN|OPT_INT, "Generate output for the Rabbit 2000", &c_cpu, NULL, CPU_R2K },
+    { 0, "mr3k", OPT_ASSIGN|OPT_INT, "Generate output for the Rabbit 3000", &c_cpu, NULL, CPU_R3K },
+    { 0, "mgbz80", OPT_ASSIGN|OPT_INT, "Generate output for the Gameboy Z80", &c_cpu, NULL, CPU_GBZ80 },
+    { 0, "", OPT_HEADER, "Code generation options", NULL, NULL, 0 },
+    { 0, "unsigned", OPT_BOOL, "Make all types unsigned", &c_default_unsigned, NULL, 0 },
+    { 0, "disable-builtins", OPT_BOOL, "Disable builtin functions",&c_disable_builtins, NULL, 0},
+    { 0, "doublestr", OPT_BOOL, "Store FP constants as strings", &c_double_strings, NULL, 0 },
+    { 0, "math-z88", OPT_ASSIGN|OPT_INT, "(deprecated) Make FP constants match z88", &c_maths_mode, NULL, MATHS_Z88 },
 
-    { 0, "fp-exponent-bias", OPT_INT, "=<num> FP exponent bias (default: 128)", &c_fp_exponent_bias, 0 },
-    { 0, "fp-mantissa-size", OPT_INT, "=<num> FP mantissa size (default: 5 bytes)", &c_fp_mantissa_bytes, 0 },
-    { 0, "fp-mode=z80", OPT_ASSIGN|OPT_INT, "Use 48 bit doubles", &c_maths_mode, MATHS_Z80 },
-    { 0, "fp-mode=ieee", OPT_ASSIGN|OPT_INT, "Use 32 bit IEEE doubles", &c_maths_mode, MATHS_IEEE },
-    { 0, "fp-mode=mbf32", OPT_ASSIGN|OPT_INT, "Use 32 bit Microsoft Binary format", &c_maths_mode, MATHS_MBFS },
-    { 0, "fp-mode=mbf40", OPT_ASSIGN|OPT_INT, "Use 40 bit Microsoft binary format", &c_maths_mode, MATHS_MBF40 },
-    { 0, "fp-mode=mbf64", OPT_ASSIGN|OPT_INT, "Use 64 bit Microsoft binary format", &c_maths_mode, MATHS_MBF64 },
-    { 0, "fp-mode=z88", OPT_ASSIGN|OPT_INT, "Use 40 bit z88 doubles", &c_maths_mode, MATHS_Z88 },
+    { 0, "fp-exponent-bias", OPT_INT, "=<num> FP exponent bias (default: 128)", &c_fp_exponent_bias, NULL, 0 },
+    { 0, "fp-mantissa-size", OPT_INT, "=<num> FP mantissa size (default: 5 bytes)", &c_fp_mantissa_bytes, NULL, 0 },
+    { 0, "fp-mode=z80", OPT_ASSIGN|OPT_INT, "Use 48 bit doubles", &c_maths_mode, NULL, MATHS_Z80 },
+    { 0, "fp-mode=ieee", OPT_ASSIGN|OPT_INT, "Use 32 bit IEEE doubles", &c_maths_mode, NULL, MATHS_IEEE },
+    { 0, "fp-mode=mbf32", OPT_ASSIGN|OPT_INT, "Use 32 bit Microsoft Binary format", &c_maths_mode, NULL, MATHS_MBFS },
+    { 0, "fp-mode=mbf40", OPT_ASSIGN|OPT_INT, "Use 40 bit Microsoft binary format", &c_maths_mode, NULL, MATHS_MBF40 },
+    { 0, "fp-mode=mbf64", OPT_ASSIGN|OPT_INT, "Use 64 bit Microsoft binary format", &c_maths_mode, NULL, MATHS_MBF64 },
+    { 0, "fp-mode=z88", OPT_ASSIGN|OPT_INT, "Use 40 bit z88 doubles", &c_maths_mode, NULL, MATHS_Z88 },
+    { 0, "fp-mode=am9511", OPT_ASSIGN|OPT_INT, "Use 32 bit AM9511 doubles", &c_maths_mode, NULL, MATHS_AM9511 },
     
-    { 0, "noaltreg", OPT_BOOL, "Try not to use the alternative register set", &c_notaltreg, 0 },
-    { 0, "standard-escape-chars", OPT_BOOL, "Use standard mappings for \\r and \\n", &c_standard_escapecodes, 0},
-    { 0, "set-r2l-by-default", OPT_BOOL, "Use r->l calling convention by default", &c_use_r2l_calling_convention, 0 },
-    { 0, "asm", OPT_FUNCTION, "=<name> Set the assembler output (z80asm,vasm,asxx,gnu)", SetAssembler, 0 },
-    { 0, "constseg", OPT_STRING, "=<name> Set the const section name", &c_rodata_section, 0 },
-    { 0, "codeseg", OPT_STRING, "=<name> Set the code section name", &c_code_section, 0 },
-    { 0, "bssseg", OPT_STRING, "=<name> Set the bss section name", &c_bss_section, 0 },
-    { 0, "dataseg", OPT_STRING, "=<name> Set the data section name", &c_data_section, 0 },
-    { 0, "initseg", OPT_STRING, "=<name> Set the initialisation section name", &c_init_section, 0 },
-    { 0, "gcline", OPT_BOOL, "Generate C_LINE directives", &c_cline_directive, 0 },
-    { 0, "opt-code-speed", OPT_FUNCTION|OPT_STRING, "Optimise for speed not size", opt_code_speed, 0},
+    { 0, "noaltreg", OPT_BOOL, "Try not to use the alternative register set", &c_notaltreg, NULL, 0 },
+    { 0, "standard-escape-chars", OPT_BOOL, "Use standard mappings for \\r and \\n", &c_standard_escapecodes, NULL, 0},
+    { 0, "set-r2l-by-default", OPT_BOOL, "Use r->l calling convention by default", &c_use_r2l_calling_convention, NULL, 0 },
+    { 0, "constseg", OPT_STRING, "=<name> Set the const section name", &c_rodata_section, NULL, 0 },
+    { 0, "codeseg", OPT_STRING, "=<name> Set the code section name", &c_code_section, NULL, 0 },
+    { 0, "bssseg", OPT_STRING, "=<name> Set the bss section name", &c_bss_section, NULL, 0 },
+    { 0, "dataseg", OPT_STRING, "=<name> Set the data section name", &c_data_section, NULL, 0 },
+    { 0, "initseg", OPT_STRING, "=<name> Set the initialisation section name", &c_init_section, NULL, 0 },
+    { 0, "gcline", OPT_BOOL, "Generate C_LINE directives", &c_cline_directive, NULL, 0 },
+    { 0, "opt-code-speed", OPT_FUNCTION|OPT_STRING, "Optimise for speed not size", NULL, opt_code_speed, 0},
 #ifdef USEFRAME
-    { 0, "", OPT_HEADER, "Framepointer configuration:", NULL, 0 },
-    { 0, "frameix", OPT_ASSIGN|OPT_INT, "Use ix as the frame pointer", &c_framepointer_is_ix, 1},
-    { 0, "frameiy", OPT_ASSIGN|OPT_INT, "Use iy as the frame pointer", &c_framepointer_is_ix, 0},
+    { 0, "", OPT_HEADER, "Framepointer configuration:", NULL, NULL, 0 },
+    { 0, "frameix", OPT_ASSIGN|OPT_INT, "Use ix as the frame pointer", &c_framepointer_is_ix, NULL, 1},
+    { 0, "frameiy", OPT_ASSIGN|OPT_INT, "Use iy as the frame pointer", &c_framepointer_is_ix, NULL, 0},
 #endif
+    { 0, "zcc-opt", OPT_STRING, "Location for zcc_opt.def", &c_zcc_opt, NULL, (intptr_t)(void *)"zcc_opt.def"},
 
-    { 0, "", OPT_HEADER, "Error/warning handling:", NULL, 0 },
-    { 0, "stop-on-error", OPT_BOOL, "Stop on any error", &c_errstop, 0 },
+    { 0, "", OPT_HEADER, "Error/warning handling:", NULL, NULL, 0 },
+    { 0, "stop-on-error", OPT_BOOL, "Stop on any error", &c_errstop, NULL, 0 },
+    { 0, "old-diagnostic-format", OPT_BOOL, "Use old style diagnostic messages", &c_old_diagnostic_fmt, NULL, 0 },
 #if 0
-    { 0, "Wnone", OPT_FUNCTION|OPT_BOOL, "Disable all warnings", SetNoWarn, 0 },
-    { 0, "Wall", OPT_FUNCTION|OPT_BOOL, "Enable all warnings", SetAllWarn, 0 },
-    { 0, "Wn", OPT_FUNCTION, "<num> Disable a warning", UnSetWarning, 0},
+    { 0, "Wnone", OPT_FUNCTION|OPT_BOOL, "Disable all warnings", NULL, SetNoWarn, 0 },
+    { 0, "Wall", OPT_FUNCTION|OPT_BOOL, "Enable all warnings", NULL, SetAllWarn, 0 },
+    { 0, "Wn", OPT_FUNCTION, "<num> Disable a warning", NULL, UnSetWarning, 0},
 #endif
-    { 0, "W", OPT_FUNCTION, "<type> Enable a class of warnings",  SetWarning, 0 },
-    { 0, "", OPT_HEADER, "Debugging options", NULL, 0 },
-    { 0, "cc", OPT_BOOL, "Intersperse the assembler output with the source C code", &c_intermix_ccode, 0 },
-    { 0, "debug", OPT_INT, "=<val> Enable some extra logging", &debuglevel, 0 },
-    { 0, "ext", OPT_STRING, "=<ext> Set the file extension for the generated output", &c_output_extension, 0 },
-    { 0, "D", OPT_FUNCTION, "Define a preprocessor directive", SetDefine, 0 },
-    { 0, "U", OPT_FUNCTION, "Undefine a preprocessor directive" , SetUndefine, 0 },
-    { 0, "", OPT_HEADER, "All options can be prefixed with either a single or double -", NULL, 0},
-    { 0, "", OPT_HEADER, "Assignments can either be = or as next argument", NULL, 0},
+    { 0, "W", OPT_FUNCTION, "<type> Enable a class of warnings", NULL,  SetWarning, 0 },
+    { 0, "", OPT_HEADER, "Debugging options", NULL, NULL, 0 },
+    { 0, "cc", OPT_BOOL, "Intersperse the assembler output with the source C code", &c_intermix_ccode, NULL, 0 },
+    { 0, "debug", OPT_INT, "=<val> Enable some extra logging", &debuglevel, NULL, 0 },
+    { 0, "ext", OPT_STRING, "=<ext> Set the file extension for the generated output", &c_output_extension, NULL, 0 },
+    { 0, "D", OPT_FUNCTION, "Define a preprocessor directive", NULL, SetDefine, 0 },
+    { 0, "U", OPT_FUNCTION, "Undefine a preprocessor directive", NULL, SetUndefine, 0 },
+    { 0, "", OPT_HEADER, "All options can be prefixed with either a single or double -", NULL, NULL, 0},
+    { 0, "", OPT_HEADER, "Assignments can either be = or as next argument", NULL, NULL, 0},
     { 0 }
 };
 
@@ -220,7 +231,6 @@ int main(int argc, char** argv)
     c_double_strings = 0;
     c_notaltreg = NO;
     debuglevel = NO;
-    c_assembler_type = ASM_Z80ASM;
     c_framepointer_is_ix = -1;
     c_use_r2l_calling_convention = NO;
 
@@ -239,13 +249,13 @@ int main(int argc, char** argv)
 
     if ( c_maths_mode == MATHS_IEEE ) {
         c_fp_size = 4;
-        type_double = &(Type){ KIND_DOUBLE, 4, 0, .len=1 }; 
+        type_double = type_double4;
         c_fp_exponent_bias = 126;
         c_fp_mantissa_bytes = 3;
         WriteDefined("CLIB_32BIT_FLOATS", 1);
     } else if ( c_maths_mode == MATHS_MBFS ) {
         c_fp_size = 4;
-        type_double = &(Type){ KIND_DOUBLE, 4, 0, .len=1 }; 
+        type_double = type_double4;
         c_fp_exponent_bias = 128;
         c_fp_mantissa_bytes = 3;
         WriteDefined("CLIB_32BIT_FLOATS", 1);
@@ -254,7 +264,7 @@ int main(int argc, char** argv)
         c_fp_mantissa_bytes = 4;
     } else if ( c_maths_mode == MATHS_MBF64 ) {
         c_fp_size = 8;
-        type_double = &(Type){ KIND_DOUBLE, 8, 0, .len=1 }; 
+        type_double = type_double8;
         c_fp_exponent_bias = 128;
         c_fp_mantissa_bytes = 7;
         WriteDefined("CLIB_64BIT_FLOATS", 1);
@@ -262,21 +272,36 @@ int main(int argc, char** argv)
         c_fp_exponent_bias = 127;
         c_fp_mantissa_bytes = 4;
         c_fp_fudge_offset = 1;
+    } else if ( c_maths_mode == MATHS_AM9511 ) {
+        type_double = type_double4;
+        c_fp_exponent_bias = 0;
+        c_fp_mantissa_bytes = 3;
+        c_fp_size = 4;
     }
 
+
+    if ( c_cpu == CPU_8080 ) {
+        c_notaltreg = 1;
+        WriteDefined("CPU_8080", 1);
+    }
+
+    if ( c_cpu == CPU_GBZ80 ) {
+        c_notaltreg = 1;
+        WriteDefined("CPU_GBZ80", 1);
+    }
 
     litlab = getlabel(); /* Get labels for function lits*/
     openout(); /* get the output file */
     openin(); /* and initial input file */
-    header(); /* intro code */
+    gen_file_header(); /* intro code */
     parse(); /* process ALL input */
     /* dump literal queues, with label */
     /* litq starts from 1, so literp has to be -1 */
     dumplits(0, YES, litptr - 1, litlab, litq + 1);
-    write_double_queue();
+    write_constant_queue();
     dumpvars();
     dumpfns();
-    trailer(); /* follow-up code */
+    gen_file_footer(); /* follow-up code */
     closeout();
     errsummary(); /* summarize errors */
     if (errcnt)
@@ -316,6 +341,8 @@ void parse()
             dodeclare(TYPDEF);
         } else if (dodeclare(STATIK)) {
             ;
+        } else if ( amatch("__addressmod")) {
+            parse_addressmod();
         } else if (ch() == '#') {
             if (match("#asm")) {
                 doasm();
@@ -396,6 +423,8 @@ void info()
     fprintf(stderr, "Usage: %s [flags] [file]\n", gargv[0]);
 }
 
+
+
 /*
  ***********************************************************************
  *
@@ -439,7 +468,7 @@ static void dumpfns()
         }
     }
 
-    if ((fp = fopen("zcc_opt.def", "a")) == NULL) {
+    if ((fp = fopen(c_zcc_opt, "a")) == NULL) {
         errorfmt("Can't open zcc_opt.def file", 1);
     }
 
@@ -508,7 +537,7 @@ void WriteDefined(char* sname, int value)
 {
     FILE* fp;
 
-    if ((fp = fopen("zcc_opt.def", "a")) == NULL) {
+    if ((fp = fopen(c_zcc_opt, "a")) == NULL) {
         errorfmt("Can't open zcc_opt.def file", 1);
     }
     fprintf(fp, "\nIF !DEFINED_%s\n", sname);
@@ -531,7 +560,7 @@ void dumpvars()
     /* Start at the start! */
     outstr("; --- Start of Static Variables ---\n\n");
 
-    output_section(c_bss_section); // output_section("bss");
+    gen_switch_section(c_bss_section); // gen_switch_section("bss");
 
     for ( ptr = symtab; ptr != NULL; ptr = ptr->hh.next ) {
         if (ptr->name[0] != '0' ) {
@@ -550,7 +579,7 @@ void dumpvars()
                 continue;
             if ( ptr->ctype->size == -1 )
                 continue;
-            if ( ptr->bss_section ) output_section(ptr->bss_section);
+            if ( ptr->bss_section ) gen_switch_section(ptr->bss_section);
             prefix();
             outname(ptr->name, 1);
             col();
@@ -561,7 +590,7 @@ void dumpvars()
     }
 
     /* Switch back to standard section */
-    output_section(c_code_section); // output_section("code");
+    gen_switch_section(c_code_section); // gen_switch_section("code");
 }
 
 /*
@@ -578,7 +607,7 @@ void dumplits(
 
     if (queueptr) {
         if (pr_label) {
-            output_section(c_rodata_section); // output_section("text");
+            gen_switch_section(c_rodata_section); // gen_switch_section("text");
             prefix();
             queuelabel(queuelab);
             col();
@@ -638,7 +667,7 @@ void dumplits(
                 }
             }
         }
-        //output_section(c_code_section); // output_section("code");
+        //gen_switch_section(c_code_section); // gen_switch_section("code");
     }
 }
 
@@ -824,10 +853,9 @@ static void set_option(option *arg, char *value)
             *(char *)arg->value = arg->data;
         }
     } else if (arg->type & OPT_OR ) {
-            *(int *)arg->value |= arg->data;
+        *(int *)arg->value |= arg->data;
     } else if ( arg->type & OPT_FUNCTION ) {
-        void (*func)(option *arg, char *type) = arg->value;
-        func(arg,value);
+        arg->func(arg,value);
     } else if ( arg->type & OPT_BOOL ) {
         int  val = 1;
         if ( value != NULL ) {
@@ -876,22 +904,25 @@ int parse_arguments(option *args, int argc, char **argv)
                     }
                     set_option(myarg, val);
                     break;
+                } else if ( (myarg->type & (OPT_BOOL|OPT_BOOL_FALSE|OPT_ASSIGN|OPT_OR) )) {
+                    if ( myarg->long_name && strcmp(argstart, myarg->long_name) == 0 ) {
+                        set_option(myarg, NULL);
+                        break;
+                    }
                 } else if ( myarg->long_name && strncmp(argstart, myarg->long_name, strlen(myarg->long_name)) == 0 ) {
                     char  *val = NULL;
                     if ( argstart[strlen(myarg->long_name)] == '=' ) {
                         val = argstart + strlen(myarg->long_name) + 1;
+                    } else if ( strlen(argstart) > strlen(myarg->long_name) )  {
+                         /* Try and take the value after the option (without the = sign) */
+                         val = argstart + strlen(myarg->long_name);
                     } else {
-                        if ( strlen(argstart) > strlen(myarg->long_name) )  {
-                             /* Try and take the value after the option (without the = sign) */
-                             val = argstart + strlen(myarg->long_name);
-                        } else if ( (myarg->type & (OPT_BOOL|OPT_BOOL_FALSE|OPT_ASSIGN|OPT_OR)) == 0 ) {
-                            /* Otherwise it's the next argument */
-                            if ( ++i < argc ) {
-                                val = argv[i];
-                            } else {
-                                fprintf(stderr, "Insufficient number of arguments supplied\n");
-                                break;
-                            }
+                        /* Otherwise it's the next argument */
+                        if ( ++i < argc ) {
+                            val = argv[i];
+                        } else {
+                            fprintf(stderr, "Insufficient number of arguments supplied\n");
+                            break;
                         }
                     }
                     set_option(myarg, val);
@@ -938,6 +969,8 @@ static void opt_code_speed(option *arg, char* val)
             c_speed_optimisation |= OPT_LONG_COMPARE;
         } else if ( strncmp(ptr, "ucharmult", 9) == 0 ) {
             c_speed_optimisation |= OPT_UCHAR_MULT;
+        } else if ( strncmp(ptr, "floatconst", 10) == 0 ) {
+            c_speed_optimisation |= OPT_DOUBLE_CONST;
         }
     } while ( (ptr = strchr(ptr, ',')) != NULL );
 }
@@ -955,19 +988,6 @@ void SetUndefine(option *arg, char* val)
     delmac();
 }
 
-void SetAssembler(option *arg, char *assembler)
-{
-
-    if (strcmp(assembler, "z80asm") == 0 || strcmp(assembler, "mpm") == 0) {
-        c_assembler_type = ASM_Z80ASM;
-    } else if (strcmp(assembler, "asxx") == 0) {
-        c_assembler_type = ASM_ASXX;
-    } else if (strcmp(assembler, "vasm") == 0) {
-        c_assembler_type = ASM_VASM;
-    } else if (strcmp(assembler, "gnu") == 0) {
-        c_assembler_type = ASM_GNU;
-    }
-}
 
 void SetWarning(option *arg, char *value) 
 {

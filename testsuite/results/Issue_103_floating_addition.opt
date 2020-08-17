@@ -9,15 +9,15 @@
 	SECTION	code_compiler
 
 ._add_int
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,2	;const
-	ld	de,0
-	call	float
+	call	l_int2long_u_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -32,15 +32,15 @@
 
 
 ._add_int_longform
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,2	;const
-	ld	de,0
-	call	float
+	call	l_int2long_u_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -55,15 +55,15 @@
 
 
 ._add_int_longform2
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,2	;const
-	ld	de,0
-	call	float
+	call	l_int2long_u_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -78,14 +78,15 @@
 
 
 ._add_double
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
-	ld	hl,i_3+0
-	call	dload
+	ld	hl,2	;const
+	call	l_int2long_u_float
 	call	dadd
 	pop	hl
 	call	dstore
@@ -100,15 +101,15 @@
 
 
 ._sub_int
-	ld	hl,i_3+0
-	call	dldpsh
+	ld	hl,2	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,1	;const
-	ld	de,0
-	call	float
+	call	l_int2long_u_float
 	call	dsub
 	pop	hl
 	call	dstore
@@ -123,15 +124,15 @@
 
 
 ._sub_int_longform
-	ld	hl,i_3+0
-	call	dldpsh
+	ld	hl,2	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,1	;const
-	ld	de,0
-	call	float
+	call	l_int2long_u_float
 	call	dsub
 	pop	hl
 	call	dstore
@@ -146,15 +147,15 @@
 
 
 ._sub_int_longform2
-	ld	hl,i_3+0
-	call	dldpsh
+	ld	hl,2	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,1	;const
-	ld	de,0
-	call	float
+	call	l_int2long_u_float
 	call	dswap
 	call	dsub
 	pop	hl
@@ -170,14 +171,15 @@
 
 
 ._sub_double
-	ld	hl,i_3+0
-	call	dldpsh
+	ld	hl,2	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
-	ld	hl,i_2+0
-	call	dload
+	ld	hl,1	;const
+	call	l_int2long_u_float
 	call	dsub
 	pop	hl
 	call	dstore
@@ -192,14 +194,15 @@
 
 
 ._mult_int
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
-	ld	hl,i_3+0
-	call	dload
+	ld	hl,2	;const
+	call	l_int2long_u_float
 	call	dmul
 	pop	hl
 	call	dstore
@@ -214,14 +217,15 @@
 
 
 ._mult_double
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
-	ld	hl,i_3+0
-	call	dload
+	ld	hl,2	;const
+	call	l_int2long_u_float
 	call	dmul
 	pop	hl
 	call	dstore
@@ -236,15 +240,15 @@
 
 
 ._mult_double_longform
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
-	call	dldpsh
-	ld	hl,i_3+0
 	call	dload
-	call	dmul
+	ld	a,1
+	call	l_f48_ldexp
 	pop	hl
 	call	dstore
 	ld	hl,0	;const
@@ -258,16 +262,15 @@
 
 
 ._mult_double_longform2
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
-	call	dldpsh
-	ld	hl,2	;const
-	ld	de,0
-	call	float
-	call	dmul
+	call	dload
+	ld	a,1
+	call	l_f48_ldexp
 	pop	hl
 	call	dstore
 	ld	hl,0	;const
@@ -281,15 +284,15 @@
 
 
 ._div_int
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
-	call	dldpsh
-	ld	hl,i_4+0
 	call	dload
-	call	dmul
+	ld	a,-1
+	call	l_f48_ldexp
 	pop	hl
 	call	dstore
 	ld	hl,0	;const
@@ -303,15 +306,15 @@
 
 
 ._div_double
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
-	call	dldpsh
-	ld	hl,i_4+0
 	call	dload
-	call	dmul
+	ld	a,-1
+	call	l_f48_ldexp
 	pop	hl
 	call	dstore
 	ld	hl,0	;const
@@ -325,15 +328,15 @@
 
 
 ._div_double_longform
-	ld	hl,i_2+0
-	call	dldpsh
+	ld	hl,1	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
-	call	dldpsh
-	ld	hl,i_4+0
 	call	dload
-	call	dmul
+	ld	a,-1
+	call	l_f48_ldexp
 	pop	hl
 	call	dstore
 	ld	hl,0	;const
@@ -347,15 +350,15 @@
 
 
 ._div_double_longform2
-	ld	hl,i_3+0
-	call	dldpsh
+	ld	hl,2	;const
+	call	l_int2long_u_float
+	call	dpush
 	ld	hl,0	;const
 	add	hl,sp
 	push	hl
 	call	dldpsh
 	ld	hl,1	;const
-	ld	de,0
-	call	float
+	call	l_int2long_u_float
 	call	dswap
 	call	ddiv
 	pop	hl
@@ -632,15 +635,6 @@
 	defm	""
 	defb	0
 
-.i_2
-	;1.000000
-	defb	0x00,0x00,0x00,0x00,0x00,0x81
-.i_3
-	;2.000000
-	defb	0x00,0x00,0x00,0x00,0x00,0x82
-.i_4
-	;0.500000
-	defb	0x00,0x00,0x00,0x00,0x00,0x80
 
 
 	SECTION	bss_compiler
@@ -685,6 +679,7 @@
 	GLOBAL	fgetc
 	GLOBAL	ungetc
 	GLOBAL	feof
+	GLOBAL	ferror
 	GLOBAL	puts
 	GLOBAL	ftell
 	GLOBAL	fgetpos
@@ -719,6 +714,7 @@
 	GLOBAL	getk
 	GLOBAL	getk_inkey
 	GLOBAL	printk
+	GLOBAL	perror
 	GLOBAL	_add_int
 	GLOBAL	_add_int_longform
 	GLOBAL	_add_int_longform2

@@ -28,13 +28,12 @@ option_t multi8_options[] = {
 int multi8_exec(char *target)
 {
     char    filename[FILENAME_MAX+1];
-    char    name[11];
     FILE    *fpin, *fpout;
     long    pos;
     int     c;
     int     i;
-    int     len, blocklen;
-    int     cksum;
+    int     len;
+    int     cksum = 0;
 
     if ( help )
         return -1;
@@ -54,21 +53,20 @@ int multi8_exec(char *target)
         pos = origin;
     } else {
         if ( (pos = get_org_addr(crtfile)) == -1 ) {
-            myexit("Could not find parameter ZORG (not z88dk compiled?)\n",1);
+            exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
         }
     }
 
 
    if ( (fpin=fopen_bin(binname, crtfile) ) == NULL ) {
-        fprintf(stderr,"Can't open input file %s\n",binname);
-        myexit(NULL,1);
+        exit_log(1,"Can't open input file %s\n",binname);
     }
 
     /* Determine size of input file */
     if ( fseek(fpin,0,SEEK_END) ) {
-        fprintf(stderr,"Couldn't determine size of file\n");
         fclose(fpin);
-        myexit(NULL,1);
+        exit_log(1,"Couldn't determine size of file\n");
+        fclose(fpin);
     }
 
     len=ftell(fpin);
@@ -77,7 +75,7 @@ int multi8_exec(char *target)
 
     if ( (fpout=fopen(filename,"wb") ) == NULL ) {
         fclose(fpin);
-        myexit("Can't open output file\n",1);
+        exit_log(1,"Can't open output file\n");
     }
 
     writebyte(0x3a, fpout);

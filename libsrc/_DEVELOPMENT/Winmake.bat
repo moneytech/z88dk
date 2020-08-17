@@ -5,7 +5,7 @@ setlocal ENABLEDELAYEDEXPANSION
 
 @rem must have leading and trailing space
 
-set alltargets= z80 cpm m rc2014 sms vgl yaz180 z180 zx zxn 
+set alltargets= z80 cpm m math16 math32 rc2014 scz180 sms vgl yaz180 z180 zx zxn 
 
 if "%1" == "" (
    echo.
@@ -37,18 +37,20 @@ for %%t in (%targets%) do (
    if not "!temp!" == "%alltargets%" (
 
       set cpu=
+
+      if "%%t" == "scz180" (
+         set cpu="-mz180"
+      )
       if "%%t" == "yaz180" (
          set cpu="-mz180"
-      ) else (
-         if "%%t" == "z180" (
-            set cpu="-mz180"
-         ) else (
-            if "%%t" == "zxn" (
-               set cpu="-mz80-zxn"
-            )
-         )
       )
-      
+      if "%%t" == "z180" (
+         set cpu="-mz180"
+      )
+      if "%%t" == "zxn" (
+         set cpu="-mz80n"
+      )
+
       echo.
       echo target = %%t !cpu!
 
@@ -95,7 +97,7 @@ for %%t in (%targets%) do (
 
       echo   %%t_sdcc_iy.lib
 
-      z80asm !cpu! --IXIY -x%%t_sdcc_iy -D__SDCC -D__SDCC_IY @target/%%t/library/%%t_sdcc_iy.lst
+      z80asm !cpu! -IXIY -x%%t_sdcc_iy -D__SDCC -D__SDCC_IY @target/%%t/library/%%t_sdcc_iy.lst
       move /Y %%t_sdcc_iy.lib lib/sdcc_iy/%%t.lib
 
       del /S *.o > nul 2>&1

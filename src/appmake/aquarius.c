@@ -9,7 +9,7 @@
  *
  *   Stefano Bodrato - December 2001: first release
  *
- *   $Id: aquarius.c,v 1.4 2016-06-26 00:46:54 aralbrec Exp $
+ *   $Id: aquarius.c $
  */
 
 #include "appmake.h"
@@ -34,14 +34,14 @@ int aquarius_exec(char *target)
 {
     char    filename[FILENAME_MAX+1];
     char    ldr_name[FILENAME_MAX+1];
-	char	mybuf[20];
-	FILE	*fpin, *fpout;
-	int	c;
-	int	i;
-	int	len;
-	int	dlen;
+    char	mybuf[20];
+    char    *copy1, *copy2;
+    FILE	*fpin, *fpout;
+    int	c;
+    int	i;
+    int	len;
+    int	dlen;
 
-    strcpy(ldr_name,"_");
 
 
     if ( help || binname == NULL )
@@ -80,9 +80,13 @@ int aquarius_exec(char *target)
 /* BASIC loader */
 /****************/
 
-	strcat(ldr_name,filename);
-	
-	if ( (fpout=fopen(ldr_name,"wb") ) == NULL ) {
+    // Create the loader name, we need to take the zdirname, add an underscore, then the filename
+    copy1 = strdup(filename);
+    copy2 = strdup(filename);
+    snprintf(ldr_name, sizeof(ldr_name), "%s/_%s", zdirname(copy1), zbasename(copy2));
+    free(copy1);
+    free(copy2);
+ 	if ( (fpout=fopen(ldr_name,"wb") ) == NULL ) {
 		printf("Can't create the loader file\n");
 		exit(1);
 	}
@@ -179,24 +183,25 @@ int aquarius_exec(char *target)
 		exit(1);
 	}
 
+// "ffffffffffffffffffffffff 
 
 /* Write out the header  */
 	for	(i=1;i<=12;i++)
 		writebyte(255,fpout);
 
+//00
 	writebyte(0,fpout);
-
 
 /* Write out the "file name" */
 	for	(i=1;i<=6;i++)
 		writebyte('#',fpout);
 
-/*	for	(i=1;i<=6;i++)
-		writebyte(0,fpout);*/
+	for	(i=1;i<=6;i++)
+		writebyte(0,fpout);
 
 
 /* Mattel games loader relocator */
-/*
+
 	writebyte(0x2A,fpout);	// ld	hl,(14552)
 	writeword(14552,fpout);
 	writebyte(0x23,fpout);	// inc	hl	
@@ -213,9 +218,9 @@ int aquarius_exec(char *target)
 	writebyte(0xb7,fpout);	// or	a	
 	writebyte(0xed,fpout);	// sbc	hl,de	
 	writebyte(0x52,fpout);
-	writebyte(0xe5,fpout);	// push hl	
-	writebyte(0xc1,fpout);	// pop	bc	
-	writebyte(0xe1,fpout);	// pop	hl	
+	writebyte(0xe5,fpout);	// push hl
+	writebyte(0xc1,fpout);	// pop	bc
+	writebyte(0xe1,fpout);	// pop	hl
 	writebyte(0x23,fpout);	// inc hl	
 	writebyte(0x7e,fpout);	// ld	a,(hl)	
 	writebyte(0xb7,fpout);	// or	a	
@@ -228,7 +233,7 @@ int aquarius_exec(char *target)
 
 	for	(i=1;i<=41;i++)
 		writebyte(0,fpout);
-*/
+
 
 
 /* We append the binary file */

@@ -39,6 +39,14 @@
 	PUBLIC	_pause_flag	;This alternates between 0 and 1 every time pause is pressed
 	
 
+	PUBLIC __IO_VDP_DATA
+ 	PUBLIC __IO_VDP_COMMAND
+	PUBLIC __IO_VDP_STATUS
+	defc __IO_VDP_DATA              = 0xbe
+	defc __IO_VDP_COMMAND           = 0xbf
+	defc __IO_VDP_STATUS            = 0xbf
+
+
         defc    TAR__register_sp = Stack_Top
         defc    TAR__clib_exit_stack_size = 32
 	defc    __CPU_CLOCK = 3580000
@@ -160,10 +168,8 @@ cleanup:
 ;       Deallocate memory which has been allocated here!
 ;
 	push	hl
-IF CRT_ENABLE_STDIO = 1
-	EXTERN 	closeall
-	call	closeall
-ENDIF
+    call    crt0_exit
+
 
 endloop:
 	jr	endloop

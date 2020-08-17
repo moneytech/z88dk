@@ -9,7 +9,7 @@
  *
  *        By Stefano Bodrato
  *
- *        $Id: msx.c,v 1.7 2016-06-26 00:46:55 aralbrec Exp $
+ *        $Id: msx.c $
  */
 
 
@@ -23,17 +23,18 @@ static char              fmsx         = 0;
 static char              disk         = 0;
 static char              audio        = 0;
 static char              fast         = 0;
+static char              khz_22       = 0;
 static char              dumb         = 0;
 static char              loud         = 0;
 static char              help         = 0;
 
 static char              bit_state    = 0;
-static char              h_lvl;
-static char              l_lvl;
-static char              msx_h_lvl;
-static char              msx_l_lvl;
+static uint8_t           h_lvl;
+static uint8_t           l_lvl;
+static uint8_t           msx_h_lvl;
+static uint8_t           msx_l_lvl;
 
-static char   blockid[8] = { 0x1F, 0xA6, 0xDE, 0xBA, 0xCC, 0x13, 0x7D, 0x74 };
+static uint8_t blockid[8] = { 0x1F, 0xA6, 0xDE, 0xBA, 0xCC, 0x13, 0x7D, 0x74 };
 
 
 /* Options that are available for this module */
@@ -46,6 +47,7 @@ option_t msx_options[] = {
     {  0,  "fmsx",     "fMSX CAS format",  OPT_BOOL,  &fmsx },
     {  0,  "audio",    "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",     "Tweak the audio tones to run a bit faster",  OPT_BOOL,  &fast },
+    {  0,  "22",       "22050hz bitrate option",     OPT_BOOL,  &khz_22 },
     {  0,  "dumb",     "Just convert to WAV a tape file",  OPT_BOOL,  &dumb },
     {  0,  "loud",     "Louder audio volume",        OPT_BOOL,  &loud },
     {  0,  "disk",     "Create an MSXDOS disc",      OPT_BOOL,  &disk },
@@ -134,7 +136,7 @@ int msx_exec(char* target)
         pos = origin;
     } else {
         if ((pos = get_org_addr(crtfile)) == -1) {
-            myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+            exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
         }
     }
 
@@ -196,12 +198,8 @@ int msx_exec(char* target)
                 fputc(0xd0, fpout);
 
             /* Deal with the filename */
-            if (strlen(binname) >= 6) {
-                strncpy(name, binname, 6);
-            } else {
-                strcpy(name, binname);
-                strncat(name, "      ", 6 - strlen(binname));
-            }
+            snprintf(name, sizeof(name), "%-*s", (int) sizeof(name)-1, binname);
+
             for (i = 0; i < 6; i++)
                 writebyte(name[i], fpout);
 
@@ -238,15 +236,14 @@ int msx_exec(char* target)
     /* ***************************************** */
     /*  Now, if requested, create the audio file */
     /* ***************************************** */
-    if ((audio) || (fast) || (loud)) {
+    if ((audio) || (fast) || (khz_22) || (loud)) {
         if ((fpin = fopen(filename, "rb")) == NULL) {
-            fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-            myexit(NULL, 1);
+            exit_log(1,  "Can't open file %s for wave conversion\n", filename);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
         len = ftell(fpin);
         fseek(fpin, 0, SEEK_SET);
@@ -256,8 +253,7 @@ int msx_exec(char* target)
         suffix_change(wavfile, ".RAW");
 
         if ((fpout = fopen(wavfile, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output raw audio file %s\n", wavfile);
-            myexit(NULL, 1);
+            exit_log(1,  "Can't open output raw audio file %s\n", wavfile);
         }
 
         /* leading silence and tone*/
@@ -310,7 +306,10 @@ int msx_exec(char* target)
         fclose(fpout);
 
         /* Now complete with the WAV header */
-        raw2wav(wavfile);
+		if (khz_22)
+			raw2wav_22k(wavfile,2);
+		else
+			raw2wav(wavfile);
 
     } /* END of WAV CONVERSION BLOCK */
 

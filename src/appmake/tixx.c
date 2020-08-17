@@ -61,18 +61,6 @@ option_t tixx_options[] = {
 
 enum EXT { E_82P, E_83P, E_8XP, E_85S, E_86P, E_86S };
 
-void die(const char *fmt, ...)
-{
-    va_list argptr;
-
-    if (fmt)
-    {
-        va_start(argptr, fmt);
-        vfprintf(stderr, fmt, argptr);
-        va_end(argptr);
-    }
-    myexit(NULL,1);
-}
 
 int fsize(FILE *fp)
 {
@@ -136,7 +124,7 @@ void genname(const char *fname, char *name)
             *c = 0;
     } while (*c != 0);
     if (!strlen(str))
-        die("A valid variable name could not be generated!\n");
+        exit_log(1,"A valid variable name could not be generated!\n");
     strcpy(name, str);
 }
 
@@ -147,7 +135,7 @@ int tixx_exec(char *target)
     FILE *fp;
     char *buf, str[256];
     char *suffix;
-    int i, n, ext, n2;
+    int i, n, ext = E_83P, n2;
     unsigned short chk;
 
     if ( help || binname == NULL ) {
@@ -173,6 +161,8 @@ int tixx_exec(char *target)
     } else if (!stricmp(target, "ti86s")) {
         ext = E_86S;
         suffix = ".86s";
+    } else {
+        exit_log(1,"Unknown target <%s>\n",target);
     }
 
     if ( outfile == NULL ) {
@@ -198,16 +188,16 @@ int tixx_exec(char *target)
 
     fp = fopen_bin(binname, NULL);
     if (!fp)
-        die("Failed to open input file: %s\n", binname);
+        exit_log(1,"Failed to open input file: %s\n", binname);
     n = fsize(fp);
     buf = (char *)malloc(n);
-    fread(buf, n, 1, fp);
+    if (1 != fread(buf, n, 1, fp)) { fclose(fp); exit_log(1, "Could not read required data from <%s>\n",binname); }
     if (ferror(fp))
-        die("Error reading input file: %s\n", binname);
+        exit_log(1,"Error reading input file: %s\n", binname);
     fclose(fp);
     fp = fopen(filename, "wb");
     if (!fp)
-        die("Failed to open output file: %s\n", filename);
+        exit_log(1,"Failed to open output file: %s\n", filename);
     chk = 0;
 
     if (ext == E_82P)
@@ -289,7 +279,7 @@ int tixx_exec(char *target)
     writeword(chk, fp);
 
     if (ferror(fp))
-        die("Failed writing output file: %s\n", filename);
+        exit_log(1,"Failed writing output file: %s\n", filename);
     fclose(fp);
     free(buf);
     printf("'%s' successfully converted to '%s'\n", binname, filename);

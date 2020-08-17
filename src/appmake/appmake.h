@@ -20,6 +20,15 @@
 #include <unistd.h>
 #endif
 
+#if defined(__GNUC__) || defined(__clang__)
+#define __NORETURN __attribute((noreturn))
+#endif
+
+#ifndef __NORETURN
+#define __NORETURN 
+#endif
+
+#include "dirname.h"
 #include "cpmdisk.h"
 
 extern char c_install_dir[];
@@ -32,6 +41,7 @@ typedef enum { OPT_NONE, OPT_BOOL, OPT_INT, OPT_STR, OPT_INPUT=128, OPT_OUTPUT=2
 #ifndef WIN32
 enum { FALSE = 0, TRUE };
 #endif
+
 
 typedef struct {
     char     sopt;
@@ -73,6 +83,8 @@ extern option_t  cpc_options;
 extern int       cpm2_exec(char *target);
 extern option_t  cpm2_options;
 
+extern int       dai_exec(char *target);
+extern option_t  dai_options;
 
 extern int       enterprise_exec(char *target);
 extern option_t  enterprise_options;
@@ -86,8 +98,15 @@ extern option_t  fp1100_options;
 extern int       gal_exec(char *target);
 extern option_t  gal_options;
 
+extern int       gb_exec(char *target);
+extern option_t  gb_options;
+
+
 extern int       hex_exec(char *target);
 extern option_t  hex_options;
+
+extern int       homelab_exec(char *target);
+extern option_t  homelab_options;
 
 extern int       inject_exec(char *target);
 extern option_t  inject_options;
@@ -103,6 +122,9 @@ extern option_t  lynx_options;
 extern int       m5_exec(char *target);
 extern option_t  m5_options;
 
+extern int       mamepp_exec(char *target);
+extern option_t  mamepp_options;
+
 extern int       mameql_exec(char *target);
 extern option_t  mameql_options;
 
@@ -111,6 +133,9 @@ extern option_t  mc_options;
 
 extern int       msx_exec(char *target);
 extern option_t  msx_options;
+
+extern int       msxrom_exec(char *target);
+extern option_t  msxrom_options;
 
 extern int       mtx_exec(char *target);
 extern option_t  mtx_options;
@@ -130,6 +155,9 @@ extern option_t  nascom_options;
 extern int       nec_exec(char *target);
 extern option_t  nec_options;
 
+extern int       noop_exec(char *target);
+extern option_t  noop_options;
+
 extern int       pasopia7_exec(char *target);
 extern option_t  pasopia7_options;
 
@@ -141,6 +169,9 @@ extern option_t  p2000_options;
 
 extern int       px_exec(char *target);
 extern option_t  px_options;
+
+extern int       rk_exec(char *target);
+extern option_t  rk_options;
 
 extern int       sorcerer_exec(char *target);
 extern option_t  sorcerer_options;
@@ -166,6 +197,9 @@ extern option_t  glue_options;
 extern int       residos_exec(char *target);
 extern option_t  residos_options;
 
+extern int       pmd85_exec(char *target);
+extern option_t  pmd85_options;
+
 extern int       sc3000_exec(char *target);
 extern option_t  sc3000_options;
 
@@ -183,6 +217,9 @@ extern option_t  tixx_options;
 
 extern int       trs80_exec(char *target);
 extern option_t  trs80_options;
+
+extern int       vector06c_exec(char *target);
+extern option_t  vector06c_options;
 
 extern int       vg5k_exec(char *target);
 extern option_t  vg5k_options;
@@ -225,6 +262,9 @@ extern option_t  zxvgs_options;
 extern int       zx81_exec(char *target);
 extern option_t  zx81_options;
 
+extern int       tvc_exec(char *target);
+extern option_t  tvc_options;
+
 
 
 struct {
@@ -264,6 +304,10 @@ struct {
       "CPM disk image creation",
       NULL,
       cpm2_exec,     &cpm2_options },
+    { "bin2dai",  "dai",   "(C) 2020 z88dk",
+      "DAI cassete image creater",
+      NULL,
+      dai_exec,     &dai_options },
     { "bin2ep",   "enterprise",      "(C) 2011 Stefano Bodrato",
       "Adds a type 5 header to make a .app file",
       NULL,
@@ -284,6 +328,10 @@ struct {
       "Creates a tape file image for the Galaksija micro",
       NULL,
       gal_exec,   &gal_options },
+    { "makebin",  "gb",      "(C) 2000 - 2019 gbdk + z88dk",
+      "Creates a ROM image for the Gameboy",
+      NULL,
+      gb_exec,   &gb_options },
     { "gluebin", "glue", "(C) 2017 Alvin Albrecht",
       "Glue several output binaries into a single binary representing memory",
        NULL,
@@ -292,6 +340,10 @@ struct {
       "Creates an intel hex record suitable for embedded devices",
       NULL,
       hex_exec,     &hex_options },
+    { "bin2htp",  "homelab",  "(C) 2020 z88dk",
+      "Creates a .htp file for Homelab emulators",
+      NULL,
+      homelab_exec,    &homelab_options },
     { "inject",  "inject",      "(C) 2014 Dominic Morris",
       "Injects files within other files",
       inject_longhelp,
@@ -312,6 +364,10 @@ struct {
       "Generates a tape file for the Sord M5, optional WAV file",
       NULL,
       m5_exec,   &m5_options },
+    { "bin2pp",   "mamepp",  "(C) 2020 z88dk",
+      "Create a Mame quickload file (pp)",
+      NULL,
+      mamepp_exec,   &mamepp_options },
     { "bin2mql",   "mameql",  "(C) 2018 dom",
       "Create a Mame quickload file (z80bin)",
       NULL,
@@ -324,6 +380,10 @@ struct {
       "Adds a file header to enable the program to be loaded using 'bload \"file.bin\",r",
       NULL,
       msx_exec,     &msx_options },
+    { "bin2msr",  "msxrom",   "(C) 2020 z88dk",
+      "Generates an MSX rom file.",
+      NULL,
+      msxrom_exec,  &msxrom_options },
     { "bin2mtx",  "mtx",      "(C) 2011 Stefano Bodrato",
       "Memotech MTX file format packaging, optional WAV format",
       NULL,
@@ -348,14 +408,6 @@ struct {
       "PC-6001 (and others) CAS format conversion utility",
       NULL,
       nec_exec,    &nec_options },
-    { "bin2pas",   "pasopia7",  "(C) 2019 z88dk",
-      "Convert binary file to .wav",
-      NULL,
-      pasopia7_exec,    &pasopia7_options },
-    { "bin2t88",   "pc88",       "(C) 2018 Stefano Bodrato",
-      "PC-8801 T88 format conversion utility",
-      NULL,
-      pc88_exec,    &pc88_options },
     { "bin2nwbn",  "newbrain",       "(C) 2007 Stefano Bodrato",
       "BASIC loader + data block in Tape format or plain TXT (less efficient)",
       NULL,
@@ -364,10 +416,26 @@ struct {
       "Changes the binary file extension for CP/M and others",
       NULL,
       newext_exec,   &newext_options },
+    { "bin2bin",   "noop",       "(C) 2020 z88dk",
+      "A noop operator, does nothing",
+      NULL,
+      noop_exec,    &noop_options },
     { "mc2cas",   "p2000",      "(C) 2014 Stefano Bodrato",
       "Philips P2000 MicroCassette to CAS format conversion",
       NULL,
       p2000_exec,    &p2000_options },
+    { "bin2pas",   "pasopia7",  "(C) 2019 z88dk",
+      "Convert binary file to .wav",
+      NULL,
+      pasopia7_exec,    &pasopia7_options },
+    { "bin2t88",   "pc88",       "(C) 2018 Stefano Bodrato",
+      "PC-8801 T88 format conversion utility",
+      NULL,
+      pc88_exec,    &pc88_options },
+    { "bin2ptp",   "pmd85",       "(C) 2020 z88dk",
+      "Create a PMD85 ptp file",
+      NULL,
+      pmd85_exec,    &pmd85_options },
     { "px2rom",   "px",       "(C) 2015 Stefano Bodrato",
       "Create an epson PX(HC) family compatible EPROM image",
       NULL,
@@ -380,6 +448,10 @@ struct {
       "Creates a .rex application using data from a .res file and a .bin file",
       NULL,
       rex_exec,     &rex_options },
+    { "bin2rk",    "rkx",  "(C) 2020 z88dk",
+      "Create a rk? file for USSR RKs",
+      NULL,
+      rk_exec,        &rk_options },
     { "rompad",    "rom",       "(C) 2014,2017 Stefano Bodrato & Alvin Albrecht",
       "Embed a binary inside a rom, padding if necessary",
       NULL,
@@ -436,6 +508,14 @@ struct {
       "Creates a CMD file for the TRS 80",
       NULL,
       trs80_exec,   &trs80_options },
+    { "bin2cas",   "tvc",      "(C) 2019 Sandor Vass",
+      "Generate TVC .cas file from the linked binary",
+      NULL,
+      tvc_exec,   &tvc_options },
+    { "bin2fdd",  "vector06c", "(C) 2020 z88dk",
+      "Create a bootable vector06c disk",
+      NULL,
+      vector06c_exec,    &vector06c_options },
     { "vg5k2k7",    "vg5k",     "(C) 2014 Stefano Bodrato",
       "Convert to Philips VG-5000 .k7 format, optionally to WAV",
       NULL,
@@ -500,8 +580,7 @@ struct {
 #define LINEMAX         80
 
 
-#define myexit(buf, code) exit_log(code, buf)
-extern void         exit_log(int code, char *fmt, ...);
+extern void         exit_log(int code, char *fmt, ...) __NORETURN;
 extern long         parameter_search(const char *filen,const  char *ext,const char *target);
 extern FILE        *fopen_bin(const char *fname,const  char *crtfile);
 extern long         get_org_addr(char *crtfile);
@@ -516,6 +595,8 @@ extern void         writebyte(unsigned char c, FILE *fp);
 extern void         writeword(unsigned int i, FILE *fp);
 extern void         writelong(unsigned long i, FILE *fp);
 extern void         writestring(char *mystring, FILE *fp);
+
+extern void         writeword_be(unsigned int i, FILE *fp);
 
 extern void         writeword_p(unsigned int i, FILE *fp,unsigned char *p);
 extern void         writebyte_p(unsigned char c, FILE *fp,unsigned char *p);
@@ -536,6 +617,7 @@ extern void         writelong_b(unsigned long i, uint8_t **pptr);
 extern void         writestring_b(char *mystring, uint8_t **pptr);
 
 extern void         raw2wav(char *rawfilename);
+extern void         raw2wav_22k(char *rawfilename, int mode);
 
 extern void         zx_pilot(int pilot_len, FILE *fpout);
 extern void         zx_rawbit(FILE *fpout, int period);

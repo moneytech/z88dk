@@ -1,7 +1,7 @@
 /*
 Z88DK Z80 Module Assembler
 
-Copyright (C) Paulo Custodio, 2011-2017
+Copyright (C) Paulo Custodio, 2011-2020
 License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
 Repository: https://github.com/z88dk/z88dk
 
@@ -9,14 +9,15 @@ Manage the code area in memory
 */
 
 #include "codearea.h"
-#include "fileutil.h"
+#include "die.h"
 #include "errors.h"
+#include "fileutil.h"
 #include "init.h"
 #include "listfile.h"
 #include "options.h"
 #include "strutil.h"
+#include "utstring.h"
 #include "z80asm.h"
-#include "die.h"
 #include <memory.h>
 
 /*-----------------------------------------------------------------------------
@@ -493,8 +494,7 @@ byte_t *append_reserve( int num_bytes )
 }
 
 /* append binary contents of file, whole file if num_bytes < 0 */
-void patch_file_contents( FILE *file, int addr, long num_bytes )
-{
+void patch_file_contents( FILE *file, int addr, long num_bytes ) {
 	long start_ptr;
 	byte_t *buffer;
 
@@ -515,6 +515,15 @@ void patch_file_contents( FILE *file, int addr, long num_bytes )
 	{
 		buffer = alloc_space( addr, num_bytes );
 		xfread_bytes(buffer, num_bytes, file);
+	}
+}
+
+void patch_from_memory(byte_t* data, int addr, long num_bytes) {
+	init_module();
+
+	if (num_bytes > 0) {
+		byte_t *buffer = alloc_space(addr, num_bytes);
+		memcpy(buffer, data, num_bytes);
 	}
 }
 
@@ -599,7 +608,7 @@ void fwrite_codearea(const char *filename, FILE **pbinfile, FILE **prelocfile)
 		{
 			if (section->name && *section->name)					/* only if section name not empty */
 			{
-				/* change current file if address changed, or option --split-bin, or section_split */
+				/* change current file if address changed, or option -split-bin, or section_split */
 				if ((!opts.relocatable && opts.split_bin) ||
 					section->section_split ||
 					cur_addr != section->addr ||
@@ -663,10 +672,10 @@ void set_origin_directive(int origin)
 		CURRENTSECTION->origin_found = true;
 		if (origin == -1)					/* signal split section binary file */
 			CURRENTSECTION->section_split = true;
-		else if (origin >= 0 && origin <= 0xFFFF)
+		else if (origin >= 0)
 		{
 			if (CURRENTSECTION->origin_opts && CURRENTSECTION->origin >= 0)
-				; /* ignore ORG, as --origin from command line overrides */
+				; /* ignore ORG, as -r from command line overrides */
 			else
 				CURRENTSECTION->origin = origin;
 		}
@@ -693,6 +702,10 @@ void set_origin_option(int origin)
 
 void read_origin(FILE* file, Section *section) {
 	int origin = xfread_dword(file);
+	set_origin(origin, section);
+}
+
+extern void set_origin(int origin, Section *section) {
 	if (origin >= 0) {
 		section->origin = origin;
 		section->section_split = false;

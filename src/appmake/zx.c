@@ -42,7 +42,7 @@
  * 
  *        See zx-util.c
  *
- *        $Id: zx.c,v 1.27 2016-09-17 05:09:40 aralbrec Exp $
+ *        $Id: zx.c $
  */
 
 #include "appmake.h"
@@ -79,7 +79,8 @@ static struct zx_tape zxt = {
     0,          // dumb
     0,          // noloader
     0,          // noheader
-    0           // parity
+    0,          // parity
+    0           // khz22
 };
 
 static struct zx_sna zxs = {
@@ -147,6 +148,7 @@ option_t zx_options[] = {
     { 0,  "patchdata", "Turbo tape patch (i.e. cd7fff..)", OPT_STR, &zxt.patchdata },
     { 0,  "screen",    "Title screen file name",    OPT_STR,   &zxt.screen },
     { 0,  "fast",      "Create a fast loading WAV", OPT_BOOL,  &zxt.fast },
+    { 0,  "22",        "22Khz, lower rate WAV format", OPT_BOOL,  &zxt.khz22 },
     { 0,  "dumb",      "Just convert to WAV a tape file", OPT_BOOL, &zxt.dumb },
     { 0,  "noloader",  "Don't create the loader block", OPT_BOOL, &zxt.noloader },
     { 0,  "noheader",  "Don't create the header",   OPT_BOOL,  &zxt.noheader },
@@ -194,11 +196,7 @@ int zx_exec(char *target)
     if (tap && (zxc.main_fence > 0))
         fprintf(stderr, "Warning: Main-fence is ignored for tap compiles\n");
 
-    if (tap)
-        return zx_tape(&zxc, &zxt);
 
-    if (plus3)
-        return zx_plus3(&zxc, &zxt);
 
     // output formats below need banked memory model
 
@@ -471,6 +469,14 @@ int zx_exec(char *target)
     }
 
     // now the output formats
+    if (tap) {   
+        return zx_tape(&zxc, &zxt, &memory);
+    }
+
+
+
+    if (plus3)
+        return zx_plus3(&zxc, &zxt, &memory);
 
     if (dot)
     {

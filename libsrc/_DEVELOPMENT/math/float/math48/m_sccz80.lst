@@ -1,3 +1,4 @@
+math/float/math48/lm/c/sccz80/CLIB_32BIT_FLOATS
 math/float/math48/lm/c/sccz80/acos
 math/float/math48/lm/c/sccz80/acosh
 math/float/math48/lm/c/sccz80/asin
@@ -107,4 +108,6 @@ math/float/math48/lm/c/sccz80/tanh
 math/float/math48/lm/c/sccz80/tgamma
 math/float/math48/lm/c/sccz80/trunc
 math/float/math48/lm/c/sccz80/ufloat
+math/float/math48/lm/c/sccz80/l_f48_ldexp
+math/float/math48/lm/c/sccz80/l_f48_conv_float
 @math/float/math48/m_asm.lst

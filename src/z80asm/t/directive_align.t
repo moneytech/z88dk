@@ -2,7 +2,7 @@
 
 # Z88DK Z80 Module Assembler
 #
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2020
 # License: The Artistic License 2.0, http://www.perlfoundation.org/artistic_license_2_0
 # Repository: https://github.com/z88dk/z88dk/
 #
@@ -66,7 +66,7 @@ check_bin_file("test.bin", pack("C*", 1,0,0,0, 2,2,0,0, 3,3,3,0, 4,4,4,4, 5,5,5,
 
 # align inside a section with different filler byte
 unlink_testfiles();
-z80asm(<<'END', "-l -s -b -m --filler=9", 0, "", "");
+z80asm(<<'END', "-l -s -b -m -f9", 0, "", "");
 	defb 	1
 l1:	align 	4
 	defb 	2, 2
@@ -107,7 +107,7 @@ END
 check_bin_file("test.bin", pack("C*", 0, (0) x 15, 1,2,3,4));
 
 z80nm("test.o", <<'END');
-Object  file test.o at $0000: Z80RMF12
+Object  file test.o at $0000: Z80RMF14
   Name: test
   Section code: 1 bytes
     C $0000: 00
@@ -116,7 +116,7 @@ Object  file test.o at $0000: Z80RMF12
 END
 
 unlink_testfiles();
-z80asm(<<'END', "-l -s -b -m --filler=0xFF", 0, "", "");
+z80asm(<<'END', "-l -s -b -m -f0xFF", 0, "", "");
 	section code
 	nop
 

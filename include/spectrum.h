@@ -317,10 +317,34 @@ extern void __LIB__   in_MouseKempSetPos_callee(uint xcoord, uint ycoord) __smal
 // DISPLAY FILE FUNCTIONS
 //////////////////////////
 
+// NOTE: remember to compile with -pragma-define:CLIB_CONIO_NATIVE_COLOUR=1
+// in order to use INK_BLACK to INK_WHITE and PAPER_BLACK to PAPER_WHITE.
+// Clear the screen
+#define zx_cls()                  fputc_cons(12)
+
+// Set or unset the flash attribute for now on
+#define zx_setattrflash(b)        fputc_cons(18); fputc_cons((b)? 49: 48)
+
+// Set or unset the bright attribute for now on
+#define zx_setattrbright(b)       fputc_cons(19); fputc_cons((b)? 49: 48)
+
+// Set or unset the inverse attribute for now on
+#define zx_setattrinverse(b)      fputc_cons(20); fputc_cons((b)? 49: 48)
+
 // Set the border color
+// Param colour can be any of: INK_BLACK, INK_BLUE,... to INK_WHITE
 extern void  __LIB__  zx_border(uchar colour) __z88dk_fastcall;
 // Quickly set the whole screen color attributes
+// Param colour must be in the form i | p, where
+// i can be any of: INK_BLACK, INK_BLUE,... to INK_WHITE
+// p can be any of: PAPER_BLACK, PAPER_BLUE,... to PAPER_WHITE
 extern void  __LIB__  zx_colour(uchar colour) __z88dk_fastcall;
+// Change the paper attr from now on
+// i can be any of: INK_BLACK, INK_BLUE,... to INK_WHITE
+#define zx_setink(i) fputc_cons(16); fputc_cons(48 + i)
+// Change the paper attr from now on
+// p can be any of: INK_BLACK, INK_BLUE,... to INK_WHITE
+#define zx_setpaper(p) fputc_cons(17); fputc_cons(48 + i)
 // Get color attribute at given position
 extern uint  __LIB__              zx_attr(uchar row, uchar col) __smallc;
 extern uint  __LIB__              zx_screenstr(uchar row, uchar col) __smallc;
@@ -331,8 +355,17 @@ extern uint  __LIB__    zx_screenstr_callee(uchar row, uchar col) __smallc __z88
 #define zx_attr(a,b)              zx_attr_callee(a,b)
 #define zx_screenstr(a,b)         zx_screenstr_callee(a,b)
 
-#define zx_setcursorpos(a,b)      fputc_cons(22); fputc_cons(a); fputc_cons(b);
+// Sets the cursor position on screen
+// Remember to add 32 to both the desired row & col.
+#define zx_setcursorpos(row,col)      fputc_cons(22); fputc_cons(row); fputc_cons(col);
+
+// Sets the cursor position on screen
+#define zx_movecursorto(row,col)      fputc_cons(22); fputc_cons(row + 32); fputc_cons(col + 32)
+
 #define zx_topleft()              fputc_cons(22); fputc_cons(0); fputc_cons(0);
+
+// Print a string on the screen
+extern int __LIB__ zx_printf(char *fmt, ...);
 
 // In the following, screen address refers to a pixel address within the display file while
 // attribute address refers to the attributes area.
@@ -364,7 +397,7 @@ extern uint  __LIB__    zx_screenstr_callee(uchar row, uchar col) __smallc __z88
 
 // DISPLAY PIXEL ADDRESS MANIPULATORS
 
-extern uchar __LIB__              *zx_cyx2saddr(uchar row, uchar col) __smallc;
+extern uchar __LIB__              *zx_cxy2saddr(uchar row, uchar col) __smallc;
 extern uchar __LIB__  *zx_cy2saddr(uchar row) __z88dk_fastcall;           // cx assumed 0
 
 extern uchar __LIB__              *zx_pxy2saddr(uchar xcoord, uchar ycoord, uchar *mask) __smallc;
@@ -388,13 +421,15 @@ extern uchar __LIB__              *zx_saddrpleft(void *pixeladdr, uchar *mask) _
 extern uchar __LIB__              *zx_saddrpright(void *pixeladdr, uchar *mask) __smallc;
 extern uchar __LIB__  *zx_saddrpup(void *pixeladdr) __z88dk_fastcall;
 
-extern uchar __LIB__    *zx_cyx2saddr_callee(uchar row, uchar col) __smallc __z88dk_callee;
+extern uchar __LIB__    *zx_cxy2saddr_callee(uchar row, uchar col) __smallc __z88dk_callee;
 extern uchar __LIB__    *zx_pxy2saddr_callee(uchar xcoord, uchar ycoord, uchar *mask) __smallc __z88dk_callee;
 extern uint  __LIB__     zx_saddr2px_callee(void *pixeladdr, uchar mask) __smallc __z88dk_callee;
 extern uchar __LIB__    *zx_saddrpleft_callee(void *pixeladdr, uchar *mask) __smallc __z88dk_callee;
 extern uchar __LIB__    *zx_saddrpright_callee(void *pixeladdr, uchar *mask) __smallc __z88dk_callee;
 
-#define zx_cyx2saddr(a,b)          zx_cyx2saddr_callee(a,b)
+#define zx_cyx2saddr(a,b)          zx_cxy2saddr_callee(a,b)
+#define zx_cxy2saddr(a,b)          zx_cxy2saddr_callee(a,b)
+
 #define zx_pxy2saddr(a,b,c)        zx_pxy2saddr_callee(a,b,c)
 #define zx_saddr2px(a,b)           zx_saddr2px_callee(a,b)
 #define zx_saddrpleft(a,b)         zx_saddrpleft_callee(a,b)
@@ -402,7 +437,7 @@ extern uchar __LIB__    *zx_saddrpright_callee(void *pixeladdr, uchar *mask) __s
 
 // DISPLAY ATTRIBUTE ADDRESS MANIPULATORS
 
-extern uchar __LIB__              *zx_cyx2aaddr(uchar row, uchar col) __smallc;
+extern uchar __LIB__              *zx_cxy2aaddr(uchar row, uchar col) __smallc;
 extern uchar __LIB__  *zx_cy2aaddr(uchar row) __z88dk_fastcall;           // cx assumed 0
 
 extern uchar __LIB__              *zx_pxy2aaddr(uchar xcoord, uchar ycoord) __smallc;
@@ -421,11 +456,23 @@ extern uchar __LIB__  *zx_aaddrcleft(void *attraddr) __z88dk_fastcall;
 extern uchar __LIB__  *zx_aaddrcright(void *attraddr) __z88dk_fastcall;
 extern uchar __LIB__  *zx_aaddrcup(void *attraddr) __z88dk_fastcall;
 
-extern uchar __LIB__    *zx_cyx2aaddr_callee(uchar row, uchar col) __smallc __z88dk_callee;
+extern uchar __LIB__    *zx_cxy2aaddr_callee(uchar row, uchar col) __smallc __z88dk_callee;
 extern uchar __LIB__    *zx_pxy2aaddr_callee(uchar xcoord, uchar ycoord) __smallc __z88dk_callee;
 
-#define zx_cyx2aaddr(a,b)          zx_cyx2aaddr_callee(a,b)
+#define zx_cyx2aaddr(a,b)          zx_cxy2aaddr_callee(b,a)
+#define zx_cxy2aaddr(a,b)          zx_cxy2aaddr_callee(a,b)
 #define zx_pxy2aaddr(a,b)          zx_pxy2aaddr_callee(a,b)
+
+
+/* Interrupt handling */
+
+#include <interrupt.h>
+
+// Setup an im2 jump table at given address
+extern void __LIB__  zx_im2_init(void *address, uchar byte) __smallc;
+
+// Add a raster interrupt handler
+extern void __LIB__ add_raster_int(isr_t handler);
 
 
 /* This routine strips the drive specifier from the filename header.

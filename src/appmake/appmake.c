@@ -48,7 +48,9 @@ static void         cleanup_temporary_files(void);
 
 static int          num_temp_files = 0;
 static char       **temp_files = NULL;
+#ifdef WIN32
 static char         tmpnambuf[] = "apmXXXX";
+#endif
 
 
 int main(int argc, char *argv[])
@@ -200,7 +202,7 @@ long parameter_search(const char *filen,const  char *ext,const char *target)
      /* Successfully opened the file so search through it.. */
     while ( fgets(buffer,LINEMAX,fp) != NULL ) {
         if (strncmp(buffer,target,strlen(target)) == 0 && isspace(buffer[strlen(target)])) {
-            sscanf(buffer,"%*s%*s%*[ $]%lx",&val);
+            sscanf(buffer,"%*s%*s%*[ $]%lx", (long unsigned int *) &val);
             break;
         }
     }
@@ -646,6 +648,12 @@ void writeword(unsigned int i, FILE *fp)
     fputc(i/256,fp);
 }
 
+void writeword_be(unsigned int i, FILE *fp)
+{
+    fputc(i/256,fp);
+    fputc(i%256,fp);
+}
+
 void writestring(char *mystring, FILE *fp)
 {
     size_t c;
@@ -778,19 +786,18 @@ void raw2wav(char *wavfile)
 {
     char    rawfilename[FILENAME_MAX+1];
     FILE    *fpin, *fpout;
-    int		c;
-    long	i, len;
+    int      c;
+    long     i, len;
 
     strcpy(rawfilename,wavfile);
 
     if ( (fpin=fopen(wavfile,"rb") ) == NULL ) {
-        fprintf(stderr,"Can't open file %s for wave conversion\n",wavfile);
-        myexit(NULL,1);
+        exit_log(1,"Can't open file %s for wave conversion\n",wavfile);
     }
 
     if (fseek(fpin,0,SEEK_END)) {
        fclose(fpin);
-       myexit("Couldn't determine size of file\n",1);
+       exit_log(1,"Couldn't determine size of file\n",1);
     }
 
     len=ftell(fpin);
@@ -798,8 +805,7 @@ void raw2wav(char *wavfile)
     suffix_change(wavfile,".wav");
 
     if ( (fpout=fopen(wavfile,"wb") ) == NULL ) {
-        fprintf(stderr,"Can't open output raw audio file %s\n",wavfile);
-        myexit(NULL,1);
+        exit_log(1,"Can't open output raw audio file %s\n",wavfile);
     }
 
     /* Now let's think at the WAV file */
@@ -829,6 +835,83 @@ void raw2wav(char *wavfile)
 
     for (i=0; i<len;i++) {
       c=getc(fpin);
+      fputc(c,fpout);
+    }
+
+    fclose(fpin);
+    fclose(fpout);
+    remove (rawfilename);
+}
+
+
+/* Convert a 44100 Khz RAW sound file to a 22050 Khz WAV file */
+void raw2wav_22k(char *wavfile, int mode)
+{
+    char    rawfilename[FILENAME_MAX+1];
+    FILE    *fpin, *fpout;
+    int      c;
+    long     i, len;
+
+    strcpy(rawfilename,wavfile);
+
+    if ( (fpin=fopen(wavfile,"rb") ) == NULL ) {
+        exit_log(1,"Can't open file %s for wave conversion\n",wavfile);
+    }
+
+    if (fseek(fpin,0,SEEK_END)) {
+       fclose(fpin);
+       exit_log(1,"Couldn't determine size of file\n");
+    }
+
+    len=ftell(fpin)/2;
+    fseek(fpin,0L,SEEK_SET);
+    suffix_change(wavfile,".wav");
+
+    if ( (fpout=fopen(wavfile,"wb") ) == NULL ) {
+        exit_log(1,"Can't open output raw audio file %s\n",wavfile);
+    }
+
+    /* Now let's think at the WAV file */
+    writestring("RIFF",fpout);
+    writelong(len+63,fpout);
+    writestring("WAVEfmt ",fpout);
+    writelong(0x10,fpout);
+    writeword(1,fpout);
+    writeword(1,fpout);
+    writelong(22050,fpout);
+    writelong(22050,fpout);
+    writeword(1,fpout);
+    writeword(8,fpout);
+    writestring("data",fpout);
+    writelong(len,fpout);
+
+    for (i=0; i<63;i++) {
+      fputc(0x20,fpout);
+    }
+
+    /*
+    //writestring(wav_table,fpout);
+    for (i=0; i<28;i++) {
+      fputc(0x20,fpout);
+    }
+    */
+
+    for (i=0; i<len;i++) {
+
+    switch (mode)
+    {
+        case 1:
+			c=getc(fpin);
+			getc(fpin);
+            break;
+        case 2:
+			getc(fpin);
+			c=getc(fpin);
+            break;
+		default:
+			c=getc(fpin);
+			c=(c+getc(fpin))/2;
+	}
       fputc(c,fpout);
     }
 
@@ -910,8 +993,7 @@ int hexdigit(char digit)
         return digit - '0';
     }
 
-    fprintf(stderr,"\nError in patch string\n");
-    myexit(NULL,1);
+    exit_log(1,"\nError in patch string\n");
     return 0; /* Not reached */
 }
 
@@ -1076,17 +1158,17 @@ enum
 
 void mb_enumerate_banks(FILE *fmap, char *binname, struct banked_memory *memory, struct aligned_data *aligned)
 {
-    char buffer[MBLINEMAX];
-    char symbol_name[MBLINEMAX];
+    char buffer[MBLINEMAX-6];           // Prevent sscanf of buffer overflowing symbol_name
+    char symbol_name[MBLINEMAX-5];      // Prevent 'snprintf(section_name,...' overflow warning
     long symbol_value;
-    char section_name[MBLINEMAX];
+    char section_name[MBLINEMAX-5];     // Prevent 'snprintf(bfilename,...' overflow warning
     char bfilename[MBLINEMAX];
     int  c,i;
     struct stat st;
 
     // organize output binaries into banks
 
-    while (fgets(buffer, MBLINEMAX, fmap) != NULL)
+    while (fgets(buffer, MBLINEMAX-7, fmap) != NULL)
     {
         // have one line of the map file
         // make sure the entire line is consumed
@@ -1096,7 +1178,7 @@ void mb_enumerate_banks(FILE *fmap, char *binname, struct banked_memory *memory,
 
         // get symbol name and value
 
-        if (sscanf(buffer, "%s = $%lx", symbol_name, &symbol_value) == 2)
+        if (sscanf(buffer, "%s = $%lx", symbol_name, (long unsigned int *) &symbol_value) == 2)
         {
             // find out if symbol corresponds to a section name
 
@@ -1134,6 +1216,14 @@ void mb_enumerate_banks(FILE *fmap, char *binname, struct banked_memory *memory,
                         snprintf(section_name, sizeof(section_name), "%s", &symbol_name[2]);
                         section_name[len - 7] = 0;
                         snprintf(bfilename, sizeof(bfilename), "%s_%s.bin", binname, section_name);
+                        if ( stat(bfilename, &st) < 0 ) {
+                            char binname_buf[FILENAME_MAX+1];
+
+                            snprintf(binname_buf,sizeof(binname_buf),"%s", binname);
+                            suffix_change(binname_buf, "");
+
+                            snprintf(bfilename, sizeof(bfilename), "%s_%s.bin", binname_buf, section_name);
+                        }
                     }
 
                     // if section head
@@ -1463,8 +1553,10 @@ int mb_user_remove_bank(struct banked_memory *memory, char *bankname)
     return 0;
 }
 
-int mb_compare_aligned(const struct section_aligned *a, const struct section_aligned *b)
+int mb_compare_aligned(const void *va, const void *vb)
 {
+    const struct section_aligned *a = va;
+    const struct section_aligned *b = vb;
     return strcmp(a->section_name, b->section_name);
 }
 
@@ -1487,8 +1579,10 @@ int mb_check_alignment(struct aligned_data *aligned)
     return errors;
 }
 
-int mb_compare_banks(const struct section_bin *a, const struct section_bin *b)
+int mb_compare_banks(const void *va, const void *vb)
 {
+    const struct section_bin *a = va;
+    const struct section_bin *b = vb;
     return a->org - b->org;
 }
 
@@ -1553,7 +1647,6 @@ int mb_sort_banks(struct banked_memory *memory)
 
         for (j = 0; j < MAXBANKS; ++j)
         {
-            struct memory_bank *mb = &bs->membank[j];
             errors += mb_sort_banks_check(&bs->membank[j], bs->org, bs->size);
         }
     }

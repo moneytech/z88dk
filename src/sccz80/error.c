@@ -26,7 +26,9 @@ static char   *c_default_categories[] = {
     "invalid-value",
     "invalid-function-definition",
     "limited-range",
-    "implicit-function-definition"
+    "implicit-function-definition",
+    "unsupported-feature",
+    "division-by-zero"
 };
 static int     c_default_categories_num = sizeof(c_default_categories) / sizeof(c_default_categories[0]);
 
@@ -95,7 +97,18 @@ void debug(int num, char* str, ...)
 
 static void warningva(const char *category, const char *fmt, va_list ap)
 {
-    fprintf(stderr, "sccz80:%s L:%d Warning:", Filename, lineno);
+    if ( c_old_diagnostic_fmt ) {
+        fprintf(stderr, "sccz80:%s L:%d Warning:", Filename, lineno);
+    } else {
+        char filen[FILENAME_MAX+1];
+        if ( Filename[0] == '\"' ) {
+            strncpy(filen, Filename + 1, strlen(Filename) - 2);
+        } else {
+            strcpy(filen,Filename);
+        }
+        filen[strlen(Filename) - 2] = '\0';
+        fprintf(stderr, "%s:%d:%d: warning: ", filen, lineno, lptr + 1);
+    }
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, " [-W%s]\n", category);
 }
@@ -104,6 +117,8 @@ static void warningva(const char *category, const char *fmt, va_list ap)
 void warningfmt(const char *category, const char *fmt, ...)
 {
     int pass = 0;
+
+    if ( buffer_fps_num ) return;
 
     if ( c_warning_all ) {
         pass = 1;
@@ -136,10 +151,25 @@ void warningfmt(const char *category, const char *fmt, ...)
 
 void errorva(int fatal, const char *fmt, va_list ap)
 {
-    fprintf(stderr, "sccz80:%s L:%d Error:", Filename, lineno);
+    if ( buffer_fps_num ) return;
+    if ( c_old_diagnostic_fmt ) {
+        fprintf(stderr, "sccz80:%s L:%d Error:", Filename, lineno);
+    } else {
+        char filen[FILENAME_MAX+1];
+        if ( Filename[0] == '\"' ) {
+            strncpy(filen, Filename + 1, strlen(Filename) - 2);
+        } else {
+            strcpy(filen,Filename);
+        }
+        filen[strlen(Filename) - 2] = '\0';
+        fprintf(stderr, "%s:%d:%d: %s: ", filen, lineno, lptr + 1, fatal ? "fatal error" : "error");
+    }
     vfprintf(stderr, fmt, ap);
     fprintf(stderr, "\n");
     ++errcnt;
+    if ( fatal ) {
+        ccabort();
+    }
     if (c_errstop) {
         fprintf(stderr, "Continue (Y\\N) ?\n");
         if ((toupper(getchar()) == 'N'))
@@ -149,6 +179,7 @@ void errorva(int fatal, const char *fmt, va_list ap)
         fprintf(stderr, "\nMaximum (%d) number of errors reached, aborting!\n", MAXERRORS);
         ccabort();
     }
+
 }
 
 void errorfmt(const char *fmt, int fatal, ...)

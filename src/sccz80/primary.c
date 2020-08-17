@@ -10,7 +10,7 @@
 
 #include "ccdefs.h"
 
-static double   CalcStand(Kind left_kind, double left, void (*oper)(LVALUE *), double right);
+static zdouble   CalcStand(Kind left_kind, zdouble left, void (*oper)(LVALUE *), zdouble right);
 static void     nstep(LVALUE *lval, int n, void (*unstep)(LVALUE *lval));
 static void     store(LVALUE *lval);
 
@@ -19,6 +19,7 @@ int primary(LVALUE* lval)
     char sname[NAMESIZE];
     SYMBOL* ptr;
     int k;
+
     if (cmatch('(')) {
         do {
             k = heir1(lval);
@@ -98,10 +99,6 @@ int primary(LVALUE* lval)
                 lval->flags = ptr->flags;
                 lval->ptr_type = KIND_NONE;
                 if (lval->ltype->kind != KIND_ARRAY && lval->ltype->kind != KIND_STRUCT ) {
-                    if (lval->ltype->kind == KIND_PTR) {
-                        lval->ptr_type = ptr->ctype->ptr->kind;
-                        lval->val_type = (ptr->flags & FARPTR ? KIND_CPTR : KIND_INT);
-                    }
                     return (1);
                 }
                 /* Handle arrays... */
@@ -110,7 +107,6 @@ int primary(LVALUE* lval)
                 lval->indirect_kind = lval->ptr_type = ptr->type;
                 if ( ispointer(lval->ltype) || lval->ltype->kind == KIND_ARRAY )
                     lval->ptr_type = lval->ltype->ptr->kind;
-                lval->val_type = (ptr->flags & FARPTR ? KIND_CPTR : KIND_INT);
                 return (0);
             } else {
                 lval->symbol = ptr;
@@ -166,15 +162,15 @@ int primary(LVALUE* lval)
 /*
  * calculate constant expression (signed values)
  */
-double calc(
+zdouble calc(
     Kind   left_kind,
-    double left,
+    zdouble left,
     void (*oper)(LVALUE *),
-    double right, int is16bit)
+    zdouble right, int is16bit)
 {
-    if (oper == zdiv && right != 0.0)
+    if (oper == zdiv && right != 0.0) {
         return (left / right);
-    else if (oper == zmod)
+    } else if (oper == zmod)
         return ((int)left % (int)right);
     else if (oper == zle)
         return (left <= right);
@@ -190,17 +186,18 @@ double calc(
             warningfmt("limited-range", "Right shifting by more than size of object, changed to zero");
             right = 0;
         }
-        if ( is16bit ) return ((int16_t)left >> (int16_t)right);
-        else return ((int)left >> (int)right);
+        if ( is16bit ) return ((int16_t)left) >> (int16_t)right;
+        else if (left_kind == KIND_LONG) return ((int32_t)left) >> (int)right;
+        else return ((int64_t)left) >> (int)right;
     } else
         return (CalcStand(left_kind, left, oper, right));
 }
 
-double calcun(
+zdouble calcun(
     Kind   left_kind,
-    double left,
+    zdouble left,
     void (*oper)(LVALUE *),
-    double right)
+    zdouble right)
 {
     if (oper == zdiv)   {
         return (left / right);
@@ -220,7 +217,7 @@ double calcun(
             warningfmt("limited-range", "Right shifting by more than size of object, changed to zero");
             right = 0;
         }
-        return ((unsigned int)left >> (unsigned int)right);
+        return ((uint64_t)left >> (int)right);
     } else
         return (CalcStand(left_kind, left, oper, right));
 }
@@ -229,18 +226,18 @@ double calcun(
  * Calculations..standard ones - same for U & S 
  */
 
-double CalcStand(
+zdouble CalcStand(
     Kind left_kind,
-    double left,
+    zdouble left,
     void (*oper)(LVALUE *),
-    double right)
+    zdouble right)
 {
     if (oper == zor)
-        return ((unsigned int)left | (unsigned int)right);
+        return ((uint64_t)left | (uint64_t)right);
     else if (oper == zxor)
-        return ((unsigned int)left ^ (unsigned int)right);
+        return ((uint64_t)left ^ (uint64_t)right);
     else if (oper == zand)
-        return ((unsigned int)left & (unsigned int)right);
+        return ((uint64_t)left & (uint64_t)right);
     else if (oper == mult)
         return (left * right);
     else if (oper == asl) {
@@ -249,7 +246,7 @@ double CalcStand(
             warningfmt("limited-range", "Left shifting by more than size of object, changed to zero");
             right = 0;
         }
-        return ((unsigned int)left << (unsigned int)right);
+        return (zdouble)((uint64_t)left << (unsigned int)right);
     } else if (oper == zeq)
         return (left == right);
     else if (oper == zne)
@@ -261,7 +258,7 @@ double CalcStand(
 /* Complains if an operand isn't int */
 int intcheck(LVALUE* lval, LVALUE* lval2)
 {
-    if (lval->val_type == KIND_DOUBLE || lval2->val_type == KIND_DOUBLE) {
+    if ( kind_is_floating(lval->val_type)|| kind_is_floating(lval2->val_type) ) {
         errorfmt("Operands must be int", 0);
         return -1;
     }
@@ -272,49 +269,57 @@ int intcheck(LVALUE* lval, LVALUE* lval2)
 void force(Kind t1, Kind t2, char isunsigned1, char isunsigned2, int isconst)
 {
     if (t2 == KIND_CARRY) {
-        zcarryconv();
+        gen_conv_carry2int();
+        isunsigned2 = NO;
+        t2 = KIND_INT;
     }
 
-    if (t1 == KIND_DOUBLE) {
-        if (t2 != KIND_DOUBLE) {
-            zconvert_to_double(t2, isunsigned2);
-        }
+    if (kind_is_floating(t1)) {
+        zconvert_to_double(t2, t1, isunsigned2);
     } else {
-        if (t2 == KIND_DOUBLE) {
-            zconvert_from_double(t1, isunsigned1);
+        if (kind_is_floating(t2)) {
+            zconvert_from_double(t2, t1, isunsigned1);
             return;
         }
     }
+
+    if (t1 == KIND_LONGLONG) {
+        if (t2 != KIND_LONGLONG ) {
+            zconvert_to_llong(isunsigned1, t2, isunsigned2);
+        }
+        return;
+    }
+
     /* t2 =source, t1=dest */
     /* int to long, if signed, do sign, if not ld de,0 */
     /* Check to see if constant or not... */
     if (t1 == KIND_LONG) {
         if (t2 != KIND_LONG ) {
-            if (isunsigned2 == NO && isunsigned1 == NO && t2 != KIND_CARRY) {
-                convSint2long();
-            } else
-                convUint2long();
+            zconvert_to_long(isunsigned1, t2, isunsigned2);
         }
         return;
     }
 
+
+
+
     /* Converting between pointer types..far and near */
     if (t1 == KIND_CPTR && t2 == KIND_INT)
-        convUint2long();
+        gen_conv_uint2long();
     else if (t2 == KIND_CPTR && (t1 == KIND_INT || t1 == KIND_PTR))
         warningfmt("incompatible-pointer-types","Narrowing pointer from far to near");
         
     /* Char conversion */
     if (t1 == KIND_CHAR && isunsigned2 == NO && !isconst) {
         if (isunsigned1 == NO)
-            convSint2char();
+            gen_conv_sint2char();
         else
-            convUint2char();
+            gen_conv_uint2char();
     } else if (t1 == KIND_CHAR && isunsigned2 == YES && !isconst) {
         if (isunsigned1 == NO)
-            convSint2char();
+            gen_conv_sint2char();
         else
-            convUint2char();
+            gen_conv_uint2char();
     }
 }
 
@@ -324,47 +329,77 @@ void force(Kind t1, Kind t2, char isunsigned1, char isunsigned2, int isconst)
  *
  * Maybe should an operand in here for KIND_LONG?
  */
-int widen(LVALUE* lval, LVALUE* lval2)
+int widen_if_float(LVALUE* lval, LVALUE* lval2, int operator_is_commutative)
 {
-    if (lval2->val_type == KIND_DOUBLE) {
-        if (lval->val_type != KIND_DOUBLE) {
-            dpush_under(lval->ltype->kind); /* push 2nd operand UNDER 1st */
-            mainpop();
-            if (lval->val_type == KIND_LONG)
-                zpop();
-            zconvert_to_double(lval->val_type, lval->ltype->isunsigned);
-            DoubSwap();
-            lval->val_type = KIND_DOUBLE; /* type of result */
-            lval->ltype = type_double;
+    if (kind_is_floating(lval2->val_type)) {
+        if ( kind_is_floating(lval->val_type)) {
+            // Both are floating but different types
+            if ( lval->val_type == KIND_DOUBLE) {
+                // RHS is _Float16, LHS is double, promote RHS
+                zconvert_to_double(lval2->val_type, lval->val_type, lval2->ltype->isunsigned);
+                lval2->val_type = lval->val_type;
+                lval2->ltype = lval->ltype;
+                return 1;
+            }
+            // RHS is double, LHS is _Float16, promote LHS
+            // Fall thrrough
         }
-        return (1);
-    } else {
-        if (lval->val_type == KIND_DOUBLE) {
-            zconvert_to_double(lval2->val_type, lval2->ltype->isunsigned);
-            lval2->val_type = KIND_DOUBLE;
-            lval2->ltype = type_double;
-            return (1);
-        } else
-            return (0);
+        if (lval->val_type != lval2->val_type ) {
+            zconvert_stacked_to_double(lval->val_type, lval2->val_type, lval->ltype->isunsigned,operator_is_commutative);
+            lval->val_type = lval2->val_type; /* type of result */
+            lval->ltype = lval2->ltype;
+        }
+        return 1;
+    } else if (kind_is_floating(lval->val_type)) {
+        zconvert_to_double(lval2->val_type, lval->val_type, lval2->ltype->isunsigned);
+        lval2->val_type = lval->val_type;
+        lval2->ltype = lval->ltype;
+        return 1;
     }
+    return 0;
 }
 
-void widenlong(LVALUE* lval, LVALUE* lval2)
+void widenintegers(LVALUE* lval, LVALUE* lval2)
 {
     if (lval2->val_type == KIND_CARRY) {
-        zcarryconv();
+        gen_conv_carry2int();
         lval2->ltype = type_int;
         lval2->val_type = KIND_INT;
     }
 
+    if (lval2->val_type == KIND_LONGLONG) {
+        /* Second operator is long long */
+        if (lval->val_type != KIND_LONGLONG) {
+            zwiden_stack_to_llong(lval);
+            if ( lval->ltype->isunsigned ) {
+                lval->ltype = type_ulonglong;
+            } else {
+                lval->ltype = type_longlong;
+            }
+            lval->val_type = KIND_LONGLONG;
+        }
+        return;
+    }
+
+    if (lval->val_type == KIND_LONGLONG) {
+        if (lval2->val_type != KIND_LONGLONG ) {
+            zconvert_to_llong(lval->ltype->isunsigned, lval2->val_type, lval2->ltype->isunsigned);
+            if ( lval->ltype->isunsigned ) {
+                lval->ltype = type_ulonglong;
+            } else {
+                lval->ltype = type_longlong;
+            }
+            lval->val_type = KIND_LONGLONG;
+        }
+        return;
+    }
+
+
+
     if (lval2->val_type == KIND_LONG) {
         /* Second operator is long */
         if (lval->val_type != KIND_LONG) {
-            doexx(); /* Preserve other operator */
-            mainpop();
-            force(KIND_LONG, lval->val_type, lval->ltype->isunsigned, lval->ltype->isunsigned, 0);
-            lpush(); /* Put the new expansion on stk*/
-            doexx(); /* Get it back again */
+            zwiden_stack_to_long(lval);
             if ( lval->ltype->isunsigned ) {
                 lval->ltype = type_ulong;
             } else {
@@ -377,23 +412,7 @@ void widenlong(LVALUE* lval, LVALUE* lval2)
 
     if (lval->val_type == KIND_LONG) {
         if (lval2->val_type != KIND_LONG && lval2->val_type != KIND_CPTR) {
-            if ( lval->ltype->isunsigned ) {
-                if ( !lval2->ltype->isunsigned ) {
-                    // RHS is signed, 
-                    convSint2long();
-                } else {
-                    convUint2long();
-                }
-                lval->ltype = type_ulong;
-            } else {
-                if ( lval2->ltype->isunsigned ) {
-                    convUint2long();
-                } else {
-                    convSint2long();
-                }
-                lval->ltype = type_long;
-            }
-            lval->val_type = KIND_LONG;
+            zconvert_to_long(lval->ltype->isunsigned, lval2->val_type, lval2->ltype->isunsigned);
         }
         return;
     }
@@ -472,14 +491,14 @@ void prestep(
     } else {
         if (lval->indirect_kind) {
             addstk(lval);
-            if (lval->flags & FARACC)
-                lpush();
-            else
-                zpush();
+            gen_save_pointer(lval);
         }
         rvalue(lval);
         //intcheck(lval, lval);
         switch (lval->ptr_type) {
+        case KIND_LONGLONG:
+            zadd_const(lval, n * 8);
+            break;
         case KIND_DOUBLE:
             zadd_const(lval, n * c_fp_size);
             break;
@@ -491,6 +510,7 @@ void prestep(
         case KIND_CPTR:
             (*step)(lval);
         case KIND_INT:
+        case KIND_FLOAT16:
         case KIND_PTR:
             (*step)(lval);
         default:
@@ -516,15 +536,15 @@ void poststep(
     } else {
         if (lval->indirect_kind) {
             addstk(lval);
-            if (lval->flags & FARACC)
-                lpush();
-            else
-                zpush();
+            gen_save_pointer(lval);
         }
         rvalue(lval);
         switch (lval->ptr_type) {
         case KIND_DOUBLE:
             nstep(lval, n * c_fp_size, unstep);
+            break;
+        case KIND_LONGLONG:
+            nstep(lval, n * 8, unstep);
             break;
         case KIND_STRUCT:
             nstep(lval, n * lval->ltype->ptr->tag->size, unstep);
@@ -536,6 +556,7 @@ void poststep(
             nstep(lval, n * 3, unstep);
             break;
         case KIND_INT:
+        case KIND_FLOAT16:
         case KIND_PTR:
             (*step)(lval);
         default:
@@ -543,7 +564,7 @@ void poststep(
             store(lval);
             if (unstep)
                 (*unstep)(lval);
-            if (lval->ptr_type == KIND_INT||lval->ptr_type ==KIND_PTR)
+            if (lval->ptr_type == KIND_INT||lval->ptr_type ==KIND_PTR||lval->ptr_type==KIND_FLOAT16)
                 if (unstep)
                     (*unstep)(lval);
             break;
@@ -576,9 +597,9 @@ void store(LVALUE* lval)
     if ( lval->symbol ) 
         lval->symbol->isassigned = YES;
     if (lval->symbol && (lval->symbol->type == KIND_PORT8 || lval->symbol->type == KIND_PORT16) ) {
-        intrinsic_out(lval->symbol);
+        gen_intrinsic_out(lval->symbol);
     } else if (lval->indirect_kind == KIND_NONE)
-        putmem(lval->symbol);
+        gen_store_static(lval->symbol);
     else
         putstk(lval);
 }
@@ -593,11 +614,7 @@ void smartpush(LVALUE* lval, char* before)
    // outfmt(";%s Indirect kind %d kind %d flags %d\n",lval->ltype->name,lval->ltype->kind, lval->indirect_kind,lval->flags);
     if ( lval->ltype->size != 2 || lval->symbol == NULL || lval->symbol->storage != STKLOC   )  {
         addstk(lval);
-        if ((lval->flags & FARACC) ) {
-            lpush();
-        } else {
-            zpush();
-        }
+        gen_save_pointer(lval);
     } else {
         switch ((lval->symbol->offset.i) - Zsp) {
         case 0:
@@ -607,11 +624,7 @@ void smartpush(LVALUE* lval, char* before)
             break;
         default:
             addstk(lval);
-            if ((lval->flags & FARACC) ) {
-                lpush();
-            } else {
-                zpush();
-            }
+            gen_save_pointer(lval);
         }
     }
 }
@@ -648,22 +661,6 @@ void smartstore(LVALUE* lval)
     }
 }
 
-void rvaluest(LVALUE* lval)
-{
-    if ( lval->symbol && lval->symbol->isassigned == NO && buffer_fps_num == 0 ) {
-        warningfmt("maybe-uninitialized", "unknown","Variable '%s' may be used before initialisation", lval->symbol->name);
-    }
-
-    if (lval->symbol && (lval->symbol->type == KIND_PORT8  || lval->symbol->type == KIND_PORT16) ) {
-        intrinsic_in(lval->symbol);
-    } else if (lval->symbol && lval->indirect_kind == KIND_NONE) {
-       
-        getmem(lval->symbol);
-    } else {
-        indirect(lval);
-    }
-    if (lval->cast_type ) docast(lval, lval);
-}
 
 void rvalue(LVALUE* lval)
 {
@@ -671,11 +668,11 @@ void rvalue(LVALUE* lval)
         warningfmt("maybe-uninitialized","Variable '%s' may be used before initialisation", lval->symbol->name);
     }
     if (lval->symbol && (lval->symbol->type == KIND_PORT8  || lval->symbol->type == KIND_PORT16) ) {
-        intrinsic_in(lval->symbol);
+        gen_intrinsic_in(lval->symbol);
     } else if (lval->symbol && lval->indirect_kind == KIND_NONE) {
-        getmem(lval->symbol);
+        gen_load_static(lval->symbol);
     } else {           
-        indirect(lval);
+        gen_load_indirect(lval);
     }
     if (lval->cast_type ) docast(lval, lval);
 #if DEBUG_SIGN
@@ -709,6 +706,27 @@ int check_range(LVALUE *lval, int32_t min_value, int32_t max_value)
     return always;
 }
 
+#define CHECK(v, min, max) do { \
+        if ( v < min || v > max ) warningfmt("limited-range","Value is out of range for assignment"); \
+    } while (0)
+
+void check_assign_range(Type *type, double const_value)
+{
+    Kind lhs_val_type = type->kind;
+    int  factor = type->bit_size ? ((1 << type->bit_size) - 1) : 0xffff;
+
+    if ( lhs_val_type == KIND_INT && !isutype(type) ) {
+        CHECK(const_value, -(32767 & factor), (65535 & factor));
+    } else if ( lhs_val_type == KIND_INT && isutype(type) ) {
+        CHECK(const_value, 0, (65535 & factor));
+    } else if ( lhs_val_type == KIND_CHAR && !isutype(type) ) {
+        CHECK(const_value, -(127 & factor), (255 & factor));
+    } else if ( lhs_val_type == KIND_CHAR && isutype(type) ) {
+        CHECK(const_value, 0, (255 & factor));
+    }
+}
+#undef CHECK
+
 /** 
  * \retval 1 - If constant true
  * \retval 0 - If constant false
@@ -741,7 +759,7 @@ int test(int label, int parens)
             return lval.const_val;
         }
         /* false constant, jump round body */
-      //  jump(label);
+      //  gen_jp_label(label);
         return 0;
     }
     
@@ -765,7 +783,7 @@ int test(int label, int parens)
 int constexpr(double *val, Kind *type, int flag)
 {
     char *before, *start;
-    double valtemp;
+    zdouble valtemp;
     int con;
     int savesp = Zsp;
     int valtype;
@@ -775,9 +793,6 @@ int constexpr(double *val, Kind *type, int flag)
     valtype = expression(&con, &valtemp, &type_ptr);
     *val = valtemp;
     clearstage(before, 0); /* scratch generated code */
-    if ( valtype == KIND_DOUBLE && con ) {
-        decrement_double_ref_direct(valtemp);
-    }
     *type = valtype;
     Zsp = savesp;
     if (flag && con == 0)
@@ -817,7 +832,19 @@ int docast(LVALUE* lval, LVALUE *dest_lval)
     } else if ( t2 == KIND_CPTR ) {
         t2 = KIND_LONG;
     }
+    if ( kind_is_integer(lval->cast_type->kind) && dest_lval->is_const) {
+        int64_t val = dest_lval->const_val;
+        if ( lval->cast_type->kind < dest_lval->val_type) {
+            if ( lval->cast_type->kind == KIND_INT ) {
+                dest_lval->const_val = lval->cast_type->isunsigned ? (uint16_t)(val & 0xffff) : (int16_t)(val & 0xffff);
+            } else if ( lval->cast_type->kind == KIND_CHAR) {
+                dest_lval->const_val = lval->cast_type->isunsigned ? (uint8_t)(val & 0xff) : (int8_t)(val & 0xff);
+            } else if ( lval->cast_type->kind == KIND_LONG) {
+                dest_lval->const_val = lval->cast_type->isunsigned ? (uint32_t)(val & 0xffffffff) : (int32_t)(val & 0xffffffff);
+            }
+        }
 
+    }
 
     force(t1, t2, lval->cast_type->isunsigned, dest_lval->ltype->isunsigned, 0); // TODO lconst
 
@@ -837,12 +864,11 @@ int docast(LVALUE* lval, LVALUE *dest_lval)
  * Check whether a type is unsigned..
  */
 
-int utype(LVALUE* lval)
+int ulvalue(LVALUE* lval)
 {
-    if (lval->ltype->isunsigned || ispointer(lval->ltype)) 
-        return (1);
-    return (0);
+    return isutype(lval->ltype);
 }
+
 
 /*
  * Check to see whether an operation should be testjumped or not

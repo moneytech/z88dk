@@ -26,11 +26,21 @@ crt0_init_bss:
         EXTERN  __BSS_END_tail
 IF CRT_INITIALIZE_BSS = 1
         ld      hl,__BSS_head
-        ld      de,__BSS_head + 1
         ld      bc,__BSS_END_tail - __BSS_head - 1
+  IF !__CPU_8080__ && !__CPU_GBZ80__
+        ld      de,__BSS_head + 1
         xor     a 
 	ld	(hl),a
         ldir
+  ELSE
+init_8080_1:
+	ld	(hl),0
+	inc	hl
+	dec	bc
+	ld	a,b
+	or	c
+	jp	nz,init_8080_1
+  ENDIF
 ELSE
         xor     a 
 ENDIF
@@ -47,8 +57,16 @@ IF CRT_ENABLE_STDIO = 1
         ld      (hl),21 ;stderr
 ENDIF
 IF DEFINED_USING_amalloc
+  IF __CPU_GBZ80__
+	ld	hl,__BSS_END_tail
+        ld      a,l
+        ld      (_heap),a
+        ld      a,h
+        ld      (_heap+1),a
+  ELSE
 	ld	hl,__BSS_END_tail
 	ld	(_heap),hl
+  ENDIF
 ENDIF
 IF ( __crt_model & 1 )
 	; Just copy the DATA section
@@ -70,7 +88,12 @@ IF ( __crt_model & 2 )
 	call    asm_dzx7_standard
 ENDIF
 	
+		SECTION code_crt_init_exit
+			ret
 		SECTION code_crt_exit
+crt0_exit:
+			; Teardown code can go here
+		SECTION code_crt_exit_exit
 			ret
 
 		SECTION bss_crt

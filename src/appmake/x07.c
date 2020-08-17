@@ -6,7 +6,7 @@
  *
  *        Stefano Bodrato Jun 2011
  *
- *        $Id: x07.c,v 1.9 2016-06-26 00:46:55 aralbrec Exp $
+ *        $Id: x07.c $
  */
 
 #include "appmake.h"
@@ -19,11 +19,12 @@ static int               origin       = -1;
 static char              help         = 0;
 static char              audio        = 0;
 static char              fast         = 0;
+static char              khz_22       = 0;
 static char              loud         = 0;
 static char              dumb         = 0;
 
-static char              x07_h_lvl;
-static char              x07_l_lvl;
+static uint8_t           x07_h_lvl;
+static uint8_t           x07_l_lvl;
 
 
 /* Options that are available for this module */
@@ -34,6 +35,7 @@ option_t x07_options[] = {
     { 'o', "output",   "Name of output file",        OPT_STR,   &outfile },
     {  0,  "audio",    "Create also a WAV file",     OPT_BOOL,  &audio },
     {  0,  "fast",     "Create a fast loading WAV",  OPT_BOOL,  &fast },
+    {  0,  "22",        "22050hz bitrate option",    OPT_BOOL,  &khz_22 },
     {  0,  "dumb",     "Just convert to WAV a tape file",  OPT_BOOL,  &dumb },
     {  0,  "loud",     "Louder audio volume",        OPT_BOOL,  &loud },
     {  0 , "org",      "Origin of the binary (CLOADM only)",       OPT_INT,   &origin },
@@ -104,7 +106,7 @@ int x07_exec(char* target)
     char name[7];
     char addr[7];
     FILE *fpin, *fpout;
-    long pos;
+    long pos = -1;      // Prevent warning "may be used uninitialized"
     int c, i, len;
     if (help)
         return -1;
@@ -131,19 +133,18 @@ int x07_exec(char* target)
         }
 
         if (blockname == NULL)
-            blockname = binname;
+            blockname = zbasename(binname);
 
         if (origin != -1) {
             pos = origin;
         } else {
             if ((pos = get_org_addr(crtfile)) == -1) {
-                myexit("Could not find parameter ZORG (not z88dk compiled?)\n", 1);
+                exit_log(1,"Could not find parameter ZORG (not z88dk compiled?)\n");
             }
         }
 
         if ((fpin = fopen_bin(binname, crtfile)) == NULL) {
-            fprintf(stderr, "Can't open input file %s\n", binname);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open input file %s\n", binname);
         }
 
         /*
@@ -152,15 +153,14 @@ int x07_exec(char* target)
 	 */
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
 
         len = ftell(fpin);
         fseek(fpin, 0, SEEK_SET);
 
         if ((fpout = fopen(filename, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output file %s\n", filename);
-            myexit(NULL, 1);
+            exit_log(1,"Can't open output file %s\n", filename);
         }
 
         /* Code generation section */
@@ -287,8 +287,7 @@ int x07_exec(char* target)
             suffix_change(filename2, "_2.cas");
 
             if ((fpout = fopen(filename2, "wb")) == NULL) {
-                fprintf(stderr, "Can't open output file %s\n", filename2);
-                myexit(NULL, 1);
+                exit_log(1, "Can't open output file %s\n", filename2);
             }
 
             /* just make a copy of the bin file */
@@ -305,15 +304,14 @@ int x07_exec(char* target)
     /* ***************************************** */
     /*  Now, if requested, create the audio file */
     /* ***************************************** */
-    if ((audio) || (fast) || (loud)) {
+    if ((audio) || (fast) || (khz_22) || (loud)) {
         if ((fpin = fopen(filename, "rb")) == NULL) {
-            fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open file %s for wave conversion\n", filename);
         }
 
         if (fseek(fpin, 0, SEEK_END)) {
             fclose(fpin);
-            myexit("Couldn't determine size of file\n", 1);
+            exit_log(1,"Couldn't determine size of file\n");
         }
         len = ftell(fpin);
         fseek(fpin, 0, SEEK_SET);
@@ -323,8 +321,7 @@ int x07_exec(char* target)
         suffix_change(wavfile, ".RAW");
 
         if ((fpout = fopen(wavfile, "wb")) == NULL) {
-            fprintf(stderr, "Can't open output raw audio file %s\n", wavfile);
-            myexit(NULL, 1);
+            exit_log(1, "Can't open output raw audio file %s\n", wavfile);
         }
 
         /* leading silence */
@@ -369,13 +366,12 @@ int x07_exec(char* target)
 
         if (pos != 1380) {
             if ((fpin = fopen(filename2, "rb")) == NULL) {
-                fprintf(stderr, "Can't open file %s for wave conversion\n", filename);
-                myexit(NULL, 1);
+                exit_log(1, "Can't open file %s for wave conversion\n", filename);
             }
 
             if (fseek(fpin, 0, SEEK_END)) {
                 fclose(fpin);
-                myexit("Couldn't determine size of file\n", 1);
+                exit_log(1,"Couldn't determine size of file\n");
             }
             len = ftell(fpin);
             fseek(fpin, 0, SEEK_SET);
@@ -405,7 +401,11 @@ int x07_exec(char* target)
         fclose(fpout);
 
         /* Now complete with the WAV header */
-        raw2wav(wavfile);
+		if (khz_22)
+			raw2wav_22k(wavfile,2);
+		else
+			raw2wav(wavfile);
+
     }
 
     exit(0);

@@ -4,11 +4,12 @@
 ;
 ;       If an error occurs eg break we just drop back to BASIC
 ;
-;       $Id: aquarius_crt0.asm,v 1.21 2016-07-15 21:03:25 dom Exp $
+;       $Id: aquarius_crt0.asm $
 ;
 
         IF      !DEFINED_CRT_ORG_CODE
-                defc    CRT_ORG_CODE  = 14712
+                ;defc    CRT_ORG_CODE  = 14712
+				defc    CRT_ORG_CODE  = 14768
         ENDIF
 
 
@@ -38,11 +39,8 @@ cleanup:
 ;
 ;       Deallocate memory which has been allocated here!
 ;
+    call    crt0_exit
 
-IF CRT_ENABLE_STDIO = 1
-	EXTERN	closeall
-	call	closeall
-ENDIF
 
 start1:	ld	sp,0		;Restore stack to entry value
         ret

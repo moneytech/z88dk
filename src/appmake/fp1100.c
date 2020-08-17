@@ -43,7 +43,6 @@ int fp1100_exec(char *target)
     FILE    *fpin, *bootstrap_fp;
     disc_handle *h;
     long    pos, bootlen;
-    int     cksum;
     int     t,s,w,head = 0;
 
     if ( help )
@@ -88,7 +87,7 @@ int fp1100_exec(char *target)
     pos = ftell(fpin);
     fseek(fpin, 0L, SEEK_SET);
     buf = must_malloc(pos);
-    fread(buf, 1, pos, fpin);
+    if (pos != fread(buf, 1, pos, fpin)) { fclose(fpin); exit_log(1, "Could not read required data from <%s>\n",binname); }
     fclose(fpin);
 
 

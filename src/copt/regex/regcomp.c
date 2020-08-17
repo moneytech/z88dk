@@ -56,7 +56,7 @@ static char nuls[10];		/* place to point scanner in event of error */
 #define	NEXTn(n)	(p->next += (n))
 #define	GETNEXT()	(*p->next++)
 #define	SETERROR(e)	seterr(p, (e))
-#define	REQUIRE(co, e)	((co) || SETERROR(e))
+#define	REQUIRE(co, e)	(void)((co) || SETERROR(e))
 #define	MUSTSEE(c, e)	(REQUIRE(MORE() && PEEK() == (c), e))
 #define	MUSTEAT(c, e)	(REQUIRE(MORE() && GETNEXT() == (c), e))
 #define	MUSTNOTSEE(c, e)	(REQUIRE(!MORE() || PEEK() != (c), e))
@@ -1194,6 +1194,7 @@ register char *cp;
  - mcsub - subtract a collating element from a cset
  == static void mcsub(register cset *cs, register char *cp);
  */
+/*
 static void
 mcsub(cs, cp)
 register cset *cs;
@@ -1216,11 +1217,13 @@ register char *cp;
 	cs->multis = realloc(cs->multis, cs->smultis);
 	assert(cs->multis != NULL);
 }
+*/
 
 /*
  - mcin - is a collating element in a cset?
  == static int mcin(register cset *cs, register char *cp);
  */
+/*
 static int
 mcin(cs, cp)
 register cset *cs;
@@ -1228,11 +1231,14 @@ register char *cp;
 {
 	return(mcfind(cs, cp) != NULL);
 }
+*/
 
 /*
  - mcfind - find a collating element in a cset
  == static char *mcfind(register cset *cs, register char *cp);
  */
+
+/*
 static char *
 mcfind(cs, cp)
 register cset *cs;
@@ -1247,6 +1253,7 @@ register char *cp;
 			return(p);
 	return(NULL);
 }
+*/
 
 /*
  - mcinvert - invert the list of collating elements in a cset
@@ -1515,9 +1522,9 @@ findmust(p, g)
 struct parse *p;
 register struct re_guts *g;
 {
-	register sop *scan;
-	sop *start;
-	register sop *newstart;
+	register sop *scan = NULL;
+	sop *start = NULL;
+	register sop *newstart = NULL;
 	register sopno newlen;
 	register sop s;
 	register char *cp;

@@ -36,6 +36,7 @@
 #include "tune.h"
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <stdarg.h>
 #include <setjmp.h>
 #include <stddef.h>
@@ -326,7 +327,7 @@ static void init_found_files(void)
 static void reinit_lexer_state(struct lexer_state *ls, int wb)
 {
 #ifndef NO_UCPP_BUF
-	ls->input_buf = wb ? getmem(INPUT_BUF_MEMG) : 0;
+	ls->input_buf = wb ? getmem(INPUT_BUF_MEMG + 1) : 0;
 #ifdef UCPP_MMAP
 	ls->from_mmap = 0;
 #endif
@@ -989,6 +990,8 @@ static int handle_if(struct lexer_state *ls)
 	unsigned long z;
 	int ret = 0, ltww = 1;
 
+    tf.t = NULL;                                    // Prevent uninitialized use warning
+
 	/* first, get the whole line */
 	tf.art = tf.nt = 0;
 	while (!next_token(ls) && ls->ctok->type != NEWLINE) {
@@ -1197,7 +1200,7 @@ error1:
 static int handle_include(struct lexer_state *ls, unsigned long flags, int nex)
 {
 	int c, string_fname = 0;
-	char *fname;
+	char *fname = NULL;                             // Prevent uninitialized use warning
 	unsigned char *fname2;
 	size_t fname_ptr = 0;
 	long l = ls->line;

@@ -1,17 +1,19 @@
 //-----------------------------------------------------------------------------
 // zobjfile - manipulate z80asm object files
-// Copyright (C) Paulo Custodio, 2011-2018
+// Copyright (C) Paulo Custodio, 2011-2020
 // License: http://www.perlfoundation.org/artistic_license_2_0
 //-----------------------------------------------------------------------------
-#include "objfile.h"
+
 #include "fileutil.h"
+#include "objfile.h"
 #include "strutil.h"
 #include "utlist.h"
+#include "utstring.h"
+#include "zutils.h"
+#include <ctype.h>
 
 #include <sys/types.h>	// needed before regex.h
 #include "regex.h"
-
-#include <ctype.h>
 
 #define MAX_FP     0x7FFFFFFF
 #define END(a, b)  ((a) >= 0 ? (a) : (b))
@@ -26,8 +28,8 @@ bool opt_obj_hide_code = false;
 //-----------------------------------------------------------------------------
 // read from file
 //-----------------------------------------------------------------------------
-static file_type_e read_signature(FILE *fp, const char *filename,
-	str_t *signature, int *version)
+static file_type_e read_signature(FILE* fp, const char* filename,
+	UT_string* signature, int* version)
 {
 	file_type_e type = is_none;
 	*version = -1;
@@ -35,7 +37,7 @@ static file_type_e read_signature(FILE *fp, const char *filename,
 	char file_signature[SIGNATURE_SIZE + 1];
 
 	// read signature
-	if (fread(file_signature, sizeof(char), SIGNATURE_SIZE, fp) != SIGNATURE_SIZE)
+	if (fread(file_signature, 1, SIGNATURE_SIZE, fp) != SIGNATURE_SIZE)
 		die("error: signature not found in '%s'\n", filename);
 	file_signature[SIGNATURE_SIZE] = '\0';
 
@@ -46,7 +48,7 @@ static file_type_e read_signature(FILE *fp, const char *filename,
 	else
 		die("error: file '%s' not object nor library\n", filename);
 
-	str_set_n(signature, file_signature, SIGNATURE_SIZE);
+	utstr_set_n(signature, file_signature, SIGNATURE_SIZE);
 
 	// read version
 	if (sscanf(file_signature + 6, "%d", version) < 1)
@@ -65,40 +67,40 @@ static file_type_e read_signature(FILE *fp, const char *filename,
 	return type;
 }
 
-static void write_signature(FILE *fp, file_type_e type)
+static void write_signature(FILE* fp, file_type_e type)
 {
-	str_t *signature = str_new();
+	UT_string* signature = utstr_new();
 
-	str_set_f(signature,
+	utstr_set_fmt(signature,
 		"%s" SIGNATURE_VERS,
 		type == is_object ? SIGNATURE_OBJ : SIGNATURE_LIB,
 		CUR_VERSION);
 
-	xfwrite_bytes(str_data(signature), SIGNATURE_SIZE, fp);
+	xfwrite_bytes(utstr_body(signature), SIGNATURE_SIZE, fp);
 
-	str_free(signature);
+	utstr_free(signature);
 }
 
-static section_t *read_section(objfile_t *obj, FILE *fp)
+static section_t* read_section(objfile_t* obj, FILE* fp)
 {
-	str_t *name = str_new();
+	UT_string* name = utstr_new();
 
 	// read section name from file
 	xfread_bcount_str(name, fp);
 
 	// search in existing sections
-	section_t *section = NULL;
+	section_t* section = NULL;
 	DL_FOREACH(obj->sections, section) {
-		if (strcmp(str_data(name), str_data(section->name)) == 0) {
+		if (strcmp(utstr_body(name), utstr_body(section->name)) == 0) {
 			break;
 		}
 	}
 
 	if (!section)
 		die("error: section '%s' not found in file '%s'\n",
-			str_data(name), str_data(obj->filename));
+			utstr_body(name), utstr_body(obj->filename));
 
-	str_free(name);
+	utstr_free(name);
 
 	return section;
 }
@@ -107,17 +109,17 @@ static section_t *read_section(objfile_t *obj, FILE *fp)
 // output formated data
 //-----------------------------------------------------------------------------
 
-static void print_section_name(str_t *section)
+static void print_section_name(UT_string* section)
 {
 	if (opt_obj_list) {
-		if (str_len(section) > 0)
-			printf("%s", str_data(section));
+		if (utstr_len(section) > 0)
+			printf("%s", utstr_body(section));
 		else
 			printf("\"\"");
 	}
 }
 
-static void print_section(str_t *section)
+static void print_section(UT_string* section)
 {
 	if (opt_obj_list) {
 		printf(" (section ");
@@ -126,12 +128,12 @@ static void print_section(str_t *section)
 	}
 }
 
-static void print_filename_line_nr(str_t *filename, int line_nr)
+static void print_filename_line_nr(UT_string* filename, int line_nr)
 {
 	if (opt_obj_list) {
 		printf(" (file ");
-		if (str_len(filename) > 0)
-			printf("%s", str_data(filename));
+		if (utstr_len(filename) > 0)
+			printf("%s", utstr_body(filename));
 		else
 			printf("\"\"");
 		if (line_nr > 0)
@@ -140,10 +142,10 @@ static void print_filename_line_nr(str_t *filename, int line_nr)
 	}
 }
 
-static void print_bytes(UT_array *data)
+static void print_bytes(UT_array* data)
 {
 	unsigned addr = 0;
-	byte_t *p = (byte_t*)utarray_front(data);
+	byte_t* p = (byte_t*)utarray_front(data);
 	unsigned size = utarray_len(data);
 	bool need_nl = false;
 
@@ -169,15 +171,15 @@ static void print_bytes(UT_array *data)
 //-----------------------------------------------------------------------------
 // symbol
 //-----------------------------------------------------------------------------
-symbol_t *symbol_new()
+symbol_t* symbol_new()
 {
-	symbol_t *self = xnew(symbol_t);
+	symbol_t* self = xnew(symbol_t);
 
-	self->name = str_new();
+	self->name = utstr_new();
 	self->scope = self->type = '\0';
 	self->value = 0;
 	self->section = NULL;
-	self->filename = str_new();
+	self->filename = utstr_new();
 	self->line_nr = 0;
 
 	self->next = self->prev = NULL;
@@ -185,27 +187,27 @@ symbol_t *symbol_new()
 	return self;
 }
 
-void symbol_free(symbol_t *self)
+void symbol_free(symbol_t* self)
 {
-	str_free(self->name);
-	str_free(self->filename);
+	utstr_free(self->name);
+	utstr_free(self->filename);
 	xfree(self);
 }
 
 //-----------------------------------------------------------------------------
 // expressions
 //-----------------------------------------------------------------------------
-expr_t *expr_new()
+expr_t* expr_new()
 {
-	expr_t *self = xnew(expr_t);
+	expr_t* self = xnew(expr_t);
 
-	self->text = str_new();
+	self->text = utstr_new();
 	self->type = '\0';
 	self->asmpc = self->patch_ptr = 0;
 	self->section = NULL;
-	self->target_name = str_new();
+	self->target_name = utstr_new();
 
-	self->filename = str_new();
+	self->filename = utstr_new();
 	self->line_nr = 0;
 
 	self->next = self->prev = NULL;
@@ -213,11 +215,11 @@ expr_t *expr_new()
 	return self;
 }
 
-void expr_free(expr_t *self)
+void expr_free(expr_t* self)
 {
-	str_free(self->text);
-	str_free(self->target_name);
-	str_free(self->filename);
+	utstr_free(self->text);
+	utstr_free(self->target_name);
+	utstr_free(self->filename);
 	xfree(self);
 }
 
@@ -227,11 +229,11 @@ void expr_free(expr_t *self)
 
 static UT_icd ut_byte_icd = { sizeof(byte_t),NULL,NULL,NULL };
 
-section_t *section_new()
+section_t* section_new()
 {
-	section_t *self = xnew(section_t);
+	section_t* self = xnew(section_t);
 
-	self->name = str_new();
+	self->name = utstr_new();
 	utarray_new(self->data, &ut_byte_icd);
 	self->org = -1;
 	self->align = 1;
@@ -243,18 +245,18 @@ section_t *section_new()
 	return self;
 }
 
-void section_free(section_t *self)
+void section_free(section_t* self)
 {
-	str_free(self->name);
+	utstr_free(self->name);
 	utarray_free(self->data);
 
-	symbol_t *symbol, *tmp_symbol;
+	symbol_t* symbol, * tmp_symbol;
 	DL_FOREACH_SAFE(self->symbols, symbol, tmp_symbol) {
 		DL_DELETE(self->symbols, symbol);
 		symbol_free(symbol);
 	}
 
-	expr_t *expr, *tmp_expr;
+	expr_t* expr, * tmp_expr;
 	DL_FOREACH_SAFE(self->exprs, expr, tmp_expr) {
 		DL_DELETE(self->exprs, expr);
 		expr_free(expr);
@@ -266,18 +268,18 @@ void section_free(section_t *self)
 //-----------------------------------------------------------------------------
 // object file
 //-----------------------------------------------------------------------------
-objfile_t *objfile_new()
+objfile_t* objfile_new()
 {
-	objfile_t *self = xnew(objfile_t);
+	objfile_t* self = xnew(objfile_t);
 
-	self->filename = str_new();
-	self->signature = str_new();
-	self->modname = str_new();
+	self->filename = utstr_new();
+	self->signature = utstr_new();
+	self->modname = utstr_new();
 
 	self->version = self->global_org = -1;
 	self->externs = argv_new();
-	
-	section_t *section = section_new();			// section "" must exist
+
+	section_t* section = section_new();			// section "" must exist
 	self->sections = NULL;
 	DL_APPEND(self->sections, section);
 
@@ -286,14 +288,14 @@ objfile_t *objfile_new()
 	return self;
 }
 
-void objfile_free(objfile_t *self)
+void objfile_free(objfile_t* self)
 {
-	str_free(self->filename);
-	str_free(self->signature);
-	str_free(self->modname);
+	utstr_free(self->filename);
+	utstr_free(self->signature);
+	utstr_free(self->modname);
 	argv_free(self->externs);
 
-	section_t *section, *tmp;
+	section_t* section, * tmp;
 	DL_FOREACH_SAFE(self->sections, section, tmp) {
 		DL_DELETE(self->sections, section);
 		section_free(section);
@@ -305,7 +307,7 @@ void objfile_free(objfile_t *self)
 //-----------------------------------------------------------------------------
 // object file read
 //-----------------------------------------------------------------------------
-static void objfile_read_sections(objfile_t *obj, FILE *fp, long fpos_start)
+static void objfile_read_sections(objfile_t* obj, FILE* fp, long fpos_start)
 {
 	xfseek(fp, fpos_start, SEEK_SET);
 	if (obj->version >= 5) {
@@ -314,22 +316,22 @@ static void objfile_read_sections(objfile_t *obj, FILE *fp, long fpos_start)
 			if (code_size < 0)
 				break;
 
-			str_t *name = str_new();
+			UT_string* name = utstr_new();
 			xfread_bcount_str(name, fp);
 
 			// create new section object or use first if empty section
-			section_t *section;
-			if (str_len(name) == 0) {
+			section_t* section;
+			if (utstr_len(name) == 0) {
 				section = obj->sections;			// empty section is the first
-				xassert(str_len(section->name) == 0);
+				xassert(utstr_len(section->name) == 0);
 				xassert(utarray_len(section->data) == 0);
 			}
 			else {
 				section = section_new();			// create a new section
 			}
 
-			str_set(section->name, str_data(name));
-			str_free(name);
+			utstr_set(section->name, utstr_body(name));
+			utstr_free(name);
 			if (obj->version >= 8)
 				section->org = xfread_dword(fp);
 			else
@@ -371,10 +373,10 @@ static void objfile_read_sections(objfile_t *obj, FILE *fp, long fpos_start)
 	}
 	else {
 		// reuse first section object
-		section_t *section = obj->sections;
-		
+		section_t* section = obj->sections;
+
 		int code_size = xfread_word(fp);
-		if (code_size == 0) 
+		if (code_size == 0)
 			code_size = 0x10000;
 
 		utarray_resize(section->data, code_size);
@@ -390,7 +392,7 @@ static void objfile_read_sections(objfile_t *obj, FILE *fp, long fpos_start)
 	}
 }
 
-static void objfile_read_symbols(objfile_t *obj, FILE *fp, long fpos_start, long fpos_end)
+static void objfile_read_symbols(objfile_t* obj, FILE* fp, long fpos_start, long fpos_end)
 {
 	if (obj->version >= 5)					// signal end by zero type
 		fpos_end = MAX_FP;
@@ -403,9 +405,9 @@ static void objfile_read_symbols(objfile_t *obj, FILE *fp, long fpos_start, long
 		char scope = xfread_byte(fp);
 		if (scope == '\0')
 			break;							// end marker 
-		
-		symbol_t *symbol = symbol_new();	// create a new symbol
-		
+
+		symbol_t* symbol = symbol_new();	// create a new symbol
+
 		// read from file
 		symbol->scope = scope;
 		symbol->type = xfread_byte(fp);
@@ -426,7 +428,7 @@ static void objfile_read_symbols(objfile_t *obj, FILE *fp, long fpos_start, long
 		if (opt_obj_list) {
 			if (!(opt_obj_hide_local && symbol->scope == 'L')) {
 				printf("    %c %c $%04X %s",
-					symbol->scope, symbol->type, symbol->value, str_data(symbol->name));
+					symbol->scope, symbol->type, symbol->value, utstr_body(symbol->name));
 
 				if (obj->version >= 5)
 					print_section(symbol->section->name);
@@ -443,9 +445,9 @@ static void objfile_read_symbols(objfile_t *obj, FILE *fp, long fpos_start, long
 	}
 }
 
-static void objfile_read_externs(objfile_t *obj, FILE *fp, long fpos_start, long fpos_end)
+static void objfile_read_externs(objfile_t* obj, FILE* fp, long fpos_start, long fpos_end)
 {
-	str_t *name = str_new();
+	UT_string* name = utstr_new();
 
 	if (opt_obj_list)
 		printf("  Externs:\n");
@@ -453,18 +455,18 @@ static void objfile_read_externs(objfile_t *obj, FILE *fp, long fpos_start, long
 	xfseek(fp, fpos_start, SEEK_SET);
 	while (ftell(fp) < fpos_end) {
 		xfread_bcount_str(name, fp);
-		argv_push(obj->externs, str_data(name));
+		argv_push(obj->externs, utstr_body(name));
 
 		if (opt_obj_list)
-			printf("    U         %s\n", str_data(name));
+			printf("    U         %s\n", utstr_body(name));
 	}
 
-	str_free(name);
+	utstr_free(name);
 }
 
-static void objfile_read_exprs(objfile_t *obj, FILE *fp, long fpos_start, long fpos_end)
+static void objfile_read_exprs(objfile_t* obj, FILE* fp, long fpos_start, long fpos_end)
 {
-	str_t *last_filename = NULL;		// weak pointer to last filename
+	UT_string* last_filename = NULL;		// weak pointer to last filename
 	bool show_expr = opt_obj_list && !opt_obj_hide_expr;
 
 	if (obj->version >= 4)					// signal end by zero type
@@ -485,17 +487,20 @@ static void objfile_read_exprs(objfile_t *obj, FILE *fp, long fpos_start, long f
 				type == '=' ? ' ' :
 				type == 'L' ? 'l' :
 				type == 'C' ? 'w' :
-				type == 'B' ? 'W' : 'b');
+				type == 'B' ? 'W' :
+				type == 'u' ? 'w' :
+				type == 's' ? 'w' :
+				type == 'P' ? 'p' : 'b');
 
 		// create a new expression
-		expr_t *expr = expr_new();
-		
+		expr_t* expr = expr_new();
+
 		// read from file
 		expr->type = type;
 
 		if (obj->version >= 4) {
 			xfread_wcount_str(expr->filename, fp);
-			if (last_filename == NULL || str_len(expr->filename) > 0)
+			if (last_filename == NULL || utstr_len(expr->filename) > 0)
 				last_filename = expr->filename;
 
 			expr->line_nr = xfread_dword(fp);
@@ -520,8 +525,8 @@ static void objfile_read_exprs(objfile_t *obj, FILE *fp, long fpos_start, long f
 		if (obj->version >= 6) {
 			xfread_bcount_str(expr->target_name, fp);
 
-			if (show_expr && str_len(expr->target_name) > 0)
-				printf("%s := ", str_data(expr->target_name));
+			if (show_expr && utstr_len(expr->target_name) > 0)
+				printf("%s := ", utstr_body(expr->target_name));
 		}
 
 		if (obj->version >= 4) {
@@ -532,11 +537,11 @@ static void objfile_read_exprs(objfile_t *obj, FILE *fp, long fpos_start, long f
 			char end_marker = xfread_byte(fp);
 			if (end_marker != '\0')
 				die("missing expression end marker in file '%s'\n",
-					str_data(obj->filename));
+					utstr_body(obj->filename));
 		}
 
 		if (show_expr)
-			printf("%s", str_data(expr->text));
+			printf("%s", utstr_body(expr->text));
 
 		if (show_expr && obj->version >= 5)
 			print_section(expr->section->name);
@@ -552,7 +557,7 @@ static void objfile_read_exprs(objfile_t *obj, FILE *fp, long fpos_start, long f
 	}
 }
 
-void objfile_read(objfile_t *obj, FILE *fp)
+void objfile_read(objfile_t* obj, FILE* fp)
 {
 	long fpos0 = ftell(fp) - SIGNATURE_SIZE;	// before signature
 
@@ -575,7 +580,7 @@ void objfile_read(objfile_t *obj, FILE *fp)
 	xfseek(fp, fpos0 + fpos_modname, SEEK_SET);
 	xfread_bcount_str(obj->modname, fp);
 	if (opt_obj_list)
-		printf("  Name: %s\n", str_data(obj->modname));
+		printf("  Name: %s\n", utstr_body(obj->modname));
 
 	// global ORG
 	if (opt_obj_list && obj->global_org >= 0)
@@ -607,16 +612,16 @@ void objfile_read(objfile_t *obj, FILE *fp)
 //-----------------------------------------------------------------------------
 // object file write
 //-----------------------------------------------------------------------------
-static long objfile_write_exprs1(objfile_t *obj, FILE *fp, str_t *last_filename, str_t *empty)
+static long objfile_write_exprs1(objfile_t* obj, FILE* fp, UT_string* last_filename, UT_string* empty)
 {
 	long fpos0 = ftell(fp);					// start of expressions area
 	bool has_exprs = false;
 
-	section_t *section;
+	section_t* section;
 	DL_FOREACH(obj->sections, section) {
-		str_clear(last_filename);
+		utstr_clear(last_filename);
 
-		expr_t *expr;
+		expr_t* expr;
 		DL_FOREACH(section->exprs, expr) {
 			has_exprs = true;
 
@@ -624,9 +629,9 @@ static long objfile_write_exprs1(objfile_t *obj, FILE *fp, str_t *last_filename,
 			xfwrite_byte(expr->type, fp);
 
 			// store file name if different from last, folowed by source line number
-			if (strcmp(str_data(expr->filename), str_data(last_filename)) != 0) {
+			if (strcmp(utstr_body(expr->filename), utstr_body(last_filename)) != 0) {
 				xfwrite_wcount_str(expr->filename, fp);
-				str_set(last_filename, str_data(expr->filename));
+				utstr_set(last_filename, utstr_body(expr->filename));
 			}
 			else {
 				xfwrite_wcount_str(empty, fp);
@@ -650,26 +655,26 @@ static long objfile_write_exprs1(objfile_t *obj, FILE *fp, str_t *last_filename,
 		return -1;
 }
 
-static long objfile_write_exprs(objfile_t *obj, FILE *fp)
+static long objfile_write_exprs(objfile_t* obj, FILE* fp)
 {
-	str_t *last_filename = str_new();
-	str_t *empty = str_new();
+	UT_string* last_filename = utstr_new();
+	UT_string* empty = utstr_new();
 
 	long ret = objfile_write_exprs1(obj, fp, last_filename, empty);
 
-	str_free(last_filename);
-	str_free(empty);
+	utstr_free(last_filename);
+	utstr_free(empty);
 	return ret;
 }
 
-static long objfile_write_symbols(objfile_t *obj, FILE *fp)
+static long objfile_write_symbols(objfile_t* obj, FILE* fp)
 {
 	long fpos0 = ftell(fp);						// start of symbols area
 	bool has_symbols = false;
 
-	section_t *section;
+	section_t* section;
 	DL_FOREACH(obj->sections, section) {
-		symbol_t *symbol;
+		symbol_t* symbol;
 		DL_FOREACH(section->symbols, symbol) {
 			has_symbols = true;
 
@@ -691,44 +696,44 @@ static long objfile_write_symbols(objfile_t *obj, FILE *fp)
 		return -1;
 }
 
-static long objfile_write_externs1(objfile_t *obj, FILE *fp, str_t *name)
+static long objfile_write_externs1(objfile_t* obj, FILE* fp, UT_string* name)
 {
 	if (argv_len(obj->externs) == 0) return -1;		// no external symbols
 
 	long fpos0 = ftell(fp);							// start of externals area
 
-	for (char **pname = argv_front(obj->externs); *pname; pname++) {
-		str_set_f(name, "%s", *pname);
+	for (char** pname = argv_front(obj->externs); *pname; pname++) {
+		utstr_set_fmt(name, "%s", *pname);
 		xfwrite_bcount_str(name, fp);
 	}
 
 	return fpos0;
 }
 
-static long objfile_write_externs(objfile_t *obj, FILE *fp)
+static long objfile_write_externs(objfile_t* obj, FILE* fp)
 {
-	str_t *name = str_new();
+	UT_string* name = utstr_new();
 
 	long ret = objfile_write_externs1(obj, fp, name);
 
-	str_free(name);
+	utstr_free(name);
 	return ret;
 }
 
-static long objfile_write_modname(objfile_t *obj, FILE *fp)
+static long objfile_write_modname(objfile_t* obj, FILE* fp)
 {
 	long fpos0 = ftell(fp);
 	xfwrite_bcount_str(obj->modname, fp);
 	return fpos0;
 }
 
-static long objfile_write_sections(objfile_t *obj, FILE *fp)
+static long objfile_write_sections(objfile_t* obj, FILE* fp)
 {
 	if (!obj->sections) return -1;			// no section 
 
 	long fpos0 = ftell(fp);
 
-	section_t *section;
+	section_t* section;
 	DL_FOREACH(obj->sections, section) {
 		xfwrite_dword(utarray_len(section->data), fp);
 		xfwrite_bcount_str(section->name, fp);
@@ -742,7 +747,7 @@ static long objfile_write_sections(objfile_t *obj, FILE *fp)
 	return fpos0;
 }
 
-void objfile_write(objfile_t *obj, FILE *fp)
+void objfile_write(objfile_t* obj, FILE* fp)
 {
 	long fpos0 = ftell(fp);
 
@@ -780,11 +785,11 @@ void objfile_write(objfile_t *obj, FILE *fp)
 //-----------------------------------------------------------------------------
 // object or library file
 //-----------------------------------------------------------------------------
-file_t *file_new()
+file_t* file_new()
 {
-	file_t *file = xnew(file_t);
-	file->filename = str_new();
-	file->signature = str_new();
+	file_t* file = xnew(file_t);
+	file->filename = utstr_new();
+	file->signature = utstr_new();
 	file->type = is_none;
 	file->version = -1;
 	file->objs = NULL;
@@ -792,12 +797,12 @@ file_t *file_new()
 	return file;
 }
 
-void file_free(file_t *file)
+void file_free(file_t* file)
 {
-	str_free(file->filename);
-	str_free(file->signature);
+	utstr_free(file->filename);
+	utstr_free(file->signature);
 
-	objfile_t *obj, *tmp;
+	objfile_t* obj, * tmp;
 	DL_FOREACH_SAFE(file->objs, obj, tmp) {
 		DL_DELETE(file->objs, obj);
 		objfile_free(obj);
@@ -808,12 +813,12 @@ void file_free(file_t *file)
 //-----------------------------------------------------------------------------
 // read file
 //-----------------------------------------------------------------------------
-static void file_read_object(file_t *file, FILE *fp, str_t *signature, int version)
+static void file_read_object(file_t* file, FILE* fp, UT_string* signature, int version)
 {
-	objfile_t *obj = objfile_new();
+	objfile_t* obj = objfile_new();
 
-	str_set_str(obj->filename, file->filename);
-	str_set_str(obj->signature, signature);
+	utstr_set_str(obj->filename, file->filename);
+	utstr_set_str(obj->signature, signature);
 	obj->version = version;
 
 	objfile_read(obj, fp);
@@ -821,12 +826,12 @@ static void file_read_object(file_t *file, FILE *fp, str_t *signature, int versi
 	DL_APPEND(file->objs, obj);
 }
 
-static void file_read_library(file_t *file, FILE *fp, str_t *signature, int version)
+static void file_read_library(file_t* file, FILE* fp, UT_string* signature, int version)
 {
-	str_set_str(file->signature, signature);
+	utstr_set_str(file->signature, signature);
 	file->version = version;
 
-	str_t *obj_signature = str_new();
+	UT_string* obj_signature = utstr_new();
 
 	long fpos0 = ftell(fp) - SIGNATURE_SIZE;	// before signature
 	int next = SIGNATURE_SIZE;
@@ -839,9 +844,9 @@ static void file_read_library(file_t *file, FILE *fp, str_t *signature, int vers
 		next = xfread_dword(fp);
 		length = xfread_dword(fp);
 
-		file_type_e type = read_signature(fp, str_data(file->filename), obj_signature, &obj_version);
+		file_type_e type = read_signature(fp, utstr_body(file->filename), obj_signature, &obj_version);
 		if (type != is_object)
-			die("File %s: contains non-object file\n", str_data(file->filename));
+			die("File %s: contains non-object file\n", utstr_body(file->filename));
 
 		if (length == 0) {
 			if (opt_obj_list)
@@ -855,19 +860,19 @@ static void file_read_library(file_t *file, FILE *fp, str_t *signature, int vers
 			printf("\n");
 	} while (next != -1);
 
-	str_free(obj_signature);
+	utstr_free(obj_signature);
 }
 
-void file_read(file_t *file, const char *filename)
+void file_read(file_t* file, const char* filename)
 {
-	str_t *signature = str_new();
+	UT_string* signature = utstr_new();
 
 	// save file name
-	str_set(file->filename, filename);
+	utstr_set(file->filename, filename);
 
 	// open file and read signature
-	FILE *fp = xfopen(filename, "rb");
-	file->type = read_signature(fp, str_data(file->filename), signature, &file->version);
+	FILE* fp = xfopen(filename, "rb");
+	file->type = read_signature(fp, utstr_body(file->filename), signature, &file->version);
 
 	if (opt_obj_verbose)
 		printf("Reading file '%s': %s version %d\n",
@@ -882,23 +887,23 @@ void file_read(file_t *file, const char *filename)
 
 	xfclose(fp);
 
-	str_free(signature);
+	utstr_free(signature);
 }
 
 //-----------------------------------------------------------------------------
 // write file
 //-----------------------------------------------------------------------------
-static void file_write_object(file_t *file, FILE *fp)
+static void file_write_object(file_t* file, FILE* fp)
 {
 	objfile_write(file->objs, fp);
 }
 
-static void file_write_library(file_t *file, FILE *fp)
+static void file_write_library(file_t* file, FILE* fp)
 {
 	// write header
 	write_signature(fp, is_library);
 
-	for (objfile_t *obj = file->objs; obj; obj = obj->next) {
+	for (objfile_t* obj = file->objs; obj; obj = obj->next) {
 		long header_ptr = ftell(fp);
 		xfwrite_dword(-1, fp);			// place holder for next
 		xfwrite_dword(-1, fp);			// place holder for size
@@ -918,13 +923,13 @@ static void file_write_library(file_t *file, FILE *fp)
 	}
 }
 
-void file_write(file_t *file, const char *filename)
+void file_write(file_t* file, const char* filename)
 {
 	if (opt_obj_verbose)
 		printf("Writing file '%s': %s version %d\n",
 			filename, file->type == is_object ? "object" : "library", CUR_VERSION);
 
-	FILE *fp = xfopen(filename, "wb");
+	FILE* fp = xfopen(filename, "wb");
 
 	switch (file->type) {
 	case is_object:  file_write_object(file, fp);  break;
@@ -938,15 +943,15 @@ void file_write(file_t *file, const char *filename)
 //-----------------------------------------------------------------------------
 // rename sections
 //-----------------------------------------------------------------------------
-static bool delete_merged_section(objfile_t *obj, section_t **p_merged_section, 
-	section_t *section, const char *new_name)
+static bool delete_merged_section(objfile_t* obj, section_t** p_merged_section,
+	section_t* section, const char* new_name)
 {
 #define merged_section (*p_merged_section)
 
-	char *old_name = xstrdup(str_data(section->name));
+	char* old_name = xstrdup(utstr_body(section->name));
 
 	// merge section first to compute alignment
-	str_set(section->name, new_name);
+	utstr_set(section->name, new_name);
 
 	// merge section blocks
 	int merged_base;
@@ -973,7 +978,7 @@ static bool delete_merged_section(objfile_t *obj, section_t **p_merged_section,
 		utarray_concat(merged_section->data, section->data);
 		utarray_clear(section->data);
 
-		symbol_t *symbol, *tmp_symbol;
+		symbol_t* symbol, * tmp_symbol;
 		DL_FOREACH_SAFE(section->symbols, symbol, tmp_symbol) {
 			// compute changed Address
 			if (symbol->type == 'A')
@@ -985,7 +990,7 @@ static bool delete_merged_section(objfile_t *obj, section_t **p_merged_section,
 			DL_APPEND(merged_section->symbols, symbol);
 		}
 
-		expr_t *expr, *tmp_expr;
+		expr_t* expr, * tmp_expr;
 		DL_FOREACH_SAFE(section->exprs, expr, tmp_expr) {
 			// compute changed patch address
 			expr->asmpc += merged_base;
@@ -1007,11 +1012,11 @@ static bool delete_merged_section(objfile_t *obj, section_t **p_merged_section,
 #undef merged_section
 }
 
-void file_rename_sections(file_t *file, const char *old_regexp, const char *new_name)
+void file_rename_sections(file_t* file, const char* old_regexp, const char* new_name)
 {
 	if (opt_obj_verbose)
 		printf("File '%s': rename sections that match '%s' to '%s'\n",
-			str_data(file->filename), old_regexp, new_name);
+			utstr_body(file->filename), old_regexp, new_name);
 
 	// compile regular expression
 	regex_t regex;
@@ -1020,24 +1025,24 @@ void file_rename_sections(file_t *file, const char *old_regexp, const char *new_
 		die("error: could not compile regex '%s'\n", old_regexp);
 
 	// search file for sections that match
-	objfile_t *obj;
+	objfile_t* obj;
 	DL_FOREACH(file->objs, obj) {
 
 		if (opt_obj_verbose)
-			printf("Block '%s'\n", str_data(obj->signature));
+			printf("Block '%s'\n", utstr_body(obj->signature));
 
 		// section to collect all other that match
-		section_t *merged_section = NULL;
+		section_t* merged_section = NULL;
 
-		section_t *section, *tmp;
+		section_t* section, * tmp;
 		DL_FOREACH_SAFE(obj->sections, section, tmp) {
-			if (strcmp(str_data(section->name), new_name) == 0 ||
-				(reti = regexec(&regex, str_data(section->name), 0, NULL, 0)) 
-				== REG_OKAY) 
+			if (strcmp(utstr_body(section->name), new_name) == 0 ||
+				(reti = regexec(&regex, utstr_body(section->name), 0, NULL, 0))
+				== REG_OKAY)
 			{	// match
 				if (opt_obj_verbose)
 					printf("  rename section %s -> %s\n",
-						str_len(section->name) > 0 ? str_data(section->name) : "\"\"",
+						utstr_len(section->name) > 0 ? utstr_body(section->name) : "\"\"",
 						new_name);
 
 				// join sections
@@ -1049,7 +1054,7 @@ void file_rename_sections(file_t *file, const char *old_regexp, const char *new_
 			else if (reti == REG_NOMATCH) {		// no match
 				if (opt_obj_verbose)
 					printf("  skip section %s\n",
-						str_len(section->name) > 0 ? str_data(section->name) : "\"\"");
+						utstr_len(section->name) > 0 ? utstr_body(section->name) : "\"\"");
 			}
 			else {								// error
 				char msgbuf[100];
@@ -1063,44 +1068,44 @@ void file_rename_sections(file_t *file, const char *old_regexp, const char *new_
 	regfree(&regex);
 }
 
-static void obj_rename_symbol(objfile_t *obj, const char *old_name, const char *new_name)
+static void obj_rename_symbol(objfile_t* obj, const char* old_name, const char* new_name)
 {
-	str_t *new_text = str_new();
+	UT_string* new_text = utstr_new();
 
-	section_t *section;
+	section_t* section;
 	DL_FOREACH(obj->sections, section) {
-		expr_t *expr;
+		expr_t* expr;
 		DL_FOREACH(section->exprs, expr) {
-			if (strcmp(str_data(expr->target_name), old_name) == 0) {
-				str_set(expr->target_name, new_name);
+			if (strcmp(utstr_body(expr->target_name), old_name) == 0) {
+				utstr_set(expr->target_name, new_name);
 			}
 
-			char *p = NULL;
+			char* p = NULL;
 			size_t n = 0;
-			while (n < str_len(expr->text) &&
-				(p = strstr(str_data(expr->text) + n, old_name)) != NULL) {
-				if ((p == str_data(expr->text) || !isalnum(p[-1])) &&
+			while (n < utstr_len(expr->text) &&
+				(p = strstr(utstr_body(expr->text) + n, old_name)) != NULL) {
+				if ((p == utstr_body(expr->text) || !isalnum(p[-1])) &&
 					!isalnum(p[strlen(old_name)])) {
 					// old_name is not part of a bigger identifier
-					str_set_f(new_text, "%.*s%s%s",
-						p - str_data(expr->text), str_data(expr->text),
+					utstr_set_fmt(new_text, "%.*s%s%s",
+						(int)(p - utstr_body(expr->text)), utstr_body(expr->text),
 						new_name,
 						p + strlen(old_name));
-					str_set_str(expr->text, new_text);
-					n += p - str_data(expr->text) + strlen(new_name);
+					utstr_set_str(expr->text, new_text);
+					n += p - utstr_body(expr->text) + strlen(new_name);
 				}
 			}
 		}
 	}
 
-	str_free(new_text);
+	utstr_free(new_text);
 }
 
-void file_add_symbol_prefix(file_t *file, const char *regexp, const char *prefix)
+void file_add_symbol_prefix(file_t* file, const char* regexp, const char* prefix)
 {
 	if (opt_obj_verbose)
 		printf("File '%s': add prefix '%s' to symbols that match '%s'\n",
-			str_data(file->filename), prefix, regexp);
+			utstr_body(file->filename), prefix, regexp);
 
 	// compile regular expression
 	regex_t regex;
@@ -1109,37 +1114,37 @@ void file_add_symbol_prefix(file_t *file, const char *regexp, const char *prefix
 		die("error: could not compile regex '%s'\n", regexp);
 
 	// search file for symbols that match
-	str_t *new_name = str_new();
+	UT_string* new_name = utstr_new();
 
-	objfile_t *obj;
+	objfile_t* obj;
 	DL_FOREACH(file->objs, obj) {
 
 		if (opt_obj_verbose)
-			printf("Block '%s'\n", str_data(obj->signature));
+			printf("Block '%s'\n", utstr_body(obj->signature));
 
-		section_t *section;
+		section_t* section;
 		DL_FOREACH(obj->sections, section) {
 
-			symbol_t *symbol;
+			symbol_t* symbol;
 			DL_FOREACH(section->symbols, symbol) {
 				if (symbol->scope == 'G') {
-					if ((reti = regexec(&regex, str_data(symbol->name), 0, NULL, 0)) == REG_OKAY) {	// match
-						str_set_f(new_name, "%s%s", prefix, str_data(symbol->name));
+					if ((reti = regexec(&regex, utstr_body(symbol->name), 0, NULL, 0)) == REG_OKAY) {	// match
+						utstr_set_fmt(new_name, "%s%s", prefix, utstr_body(symbol->name));
 
 						if (opt_obj_verbose)
 							printf("  rename symbol %s -> %s\n",
-								str_data(symbol->name),
-								str_data(new_name));
+								utstr_body(symbol->name),
+								utstr_body(new_name));
 
 						obj_rename_symbol(obj,
-							str_data(symbol->name),
-							str_data(new_name));
+							utstr_body(symbol->name),
+							utstr_body(new_name));
 
-						str_set_str(symbol->name, new_name);
+						utstr_set_str(symbol->name, new_name);
 					}
 					else if (reti == REG_NOMATCH) {		// no match
 						if (opt_obj_verbose)
-							printf("  skip symbol %s\n", str_data(symbol->name));
+							printf("  skip symbol %s\n", utstr_body(symbol->name));
 					}
 					else {								// error
 						char msgbuf[100];
@@ -1153,22 +1158,22 @@ void file_add_symbol_prefix(file_t *file, const char *regexp, const char *prefix
 
 	// free memory
 	regfree(&regex);
-	str_free(new_name);
+	utstr_free(new_name);
 }
 
-void file_rename_symbol(file_t *file, const char *old_name, const char *new_name)
+void file_rename_symbol(file_t* file, const char* old_name, const char* new_name)
 {
 	if (opt_obj_verbose)
 		printf("File '%s': rename symbol '%s' to '%s'\n",
-			str_data(file->filename), old_name, new_name);
+			utstr_body(file->filename), old_name, new_name);
 
-	objfile_t *obj;
+	objfile_t* obj;
 	DL_FOREACH(file->objs, obj) {
 
 		if (opt_obj_verbose)
-			printf("Block '%s'\n", str_data(obj->signature));
+			printf("Block '%s'\n", utstr_body(obj->signature));
 
-		for (char **ext = argv_front(obj->externs); *ext; ext++) {
+		for (char** ext = argv_front(obj->externs); *ext; ext++) {
 			if (strcmp(*ext, old_name) == 0) {	// match
 				if (opt_obj_verbose)
 					printf("  rename symbol %s -> %s\n", old_name, new_name);
@@ -1183,22 +1188,22 @@ void file_rename_symbol(file_t *file, const char *old_name, const char *new_name
 			}
 		}
 
-		section_t *section;
+		section_t* section;
 		DL_FOREACH(obj->sections, section) {
 
-			symbol_t *symbol;
+			symbol_t* symbol;
 			DL_FOREACH(section->symbols, symbol) {
 				if (symbol->scope == 'G') {
-					if (strcmp(str_data(symbol->name), old_name) == 0) {	// match
+					if (strcmp(utstr_body(symbol->name), old_name) == 0) {	// match
 						if (opt_obj_verbose)
 							printf("  rename symbol %s -> %s\n", old_name, new_name);
 
 						obj_rename_symbol(obj, old_name, new_name);
-						str_set(symbol->name, new_name);
+						utstr_set(symbol->name, new_name);
 					}
 					else {		// no match
 						if (opt_obj_verbose)
-							printf("  skip symbol %s\n", str_data(symbol->name));
+							printf("  skip symbol %s\n", utstr_body(symbol->name));
 					}
 				}
 			}
@@ -1206,11 +1211,11 @@ void file_rename_symbol(file_t *file, const char *old_name, const char *new_name
 	}
 }
 
-static void file_change_symbols_scope(file_t *file, const char *regexp, char old_scope, char new_scope)
+static void file_change_symbols_scope(file_t* file, const char* regexp, char old_scope, char new_scope)
 {
 	if (opt_obj_verbose)
 		printf("File '%s': make symbols that match '%s' %s\n",
-			str_data(file->filename), regexp,
+			utstr_body(file->filename), regexp,
 			new_scope == 'L' ? "local" : "global");
 
 	// compile regular expression
@@ -1220,26 +1225,26 @@ static void file_change_symbols_scope(file_t *file, const char *regexp, char old
 		die("error: could not compile regex '%s'\n", regexp);
 
 	// search file for symbols that match
-	objfile_t *obj;
+	objfile_t* obj;
 	DL_FOREACH(file->objs, obj) {
 
 		if (opt_obj_verbose)
-			printf("Block '%s'\n", str_data(obj->signature));
+			printf("Block '%s'\n", utstr_body(obj->signature));
 
-		section_t *section;
+		section_t* section;
 		DL_FOREACH(obj->sections, section) {
 
-			symbol_t *symbol;
+			symbol_t* symbol;
 			DL_FOREACH(section->symbols, symbol) {
 				if (symbol->scope == old_scope) {
-					if ((reti = regexec(&regex, str_data(symbol->name), 0, NULL, 0)) == REG_OKAY) {	// match
+					if ((reti = regexec(&regex, utstr_body(symbol->name), 0, NULL, 0)) == REG_OKAY) {	// match
 						if (opt_obj_verbose)
-							printf("  change scope of symbol %s -> %c\n", str_data(symbol->name), new_scope);
+							printf("  change scope of symbol %s -> %c\n", utstr_body(symbol->name), new_scope);
 						symbol->scope = new_scope;
 					}
 					else if (reti == REG_NOMATCH) {		// no match
 						if (opt_obj_verbose)
-							printf("  skip symbol %s\n", str_data(symbol->name));
+							printf("  skip symbol %s\n", utstr_body(symbol->name));
 					}
 					else {								// error
 						char msgbuf[100];
@@ -1255,73 +1260,73 @@ static void file_change_symbols_scope(file_t *file, const char *regexp, char old
 	regfree(&regex);
 }
 
-void file_make_symbols_local(file_t *file, const char *regexp)
+void file_make_symbols_local(file_t* file, const char* regexp)
 {
 	file_change_symbols_scope(file, regexp, 'G', 'L');
 }
 
-void file_make_symbols_global(file_t *file, const char *regexp)
+void file_make_symbols_global(file_t* file, const char* regexp)
 {
 	file_change_symbols_scope(file, regexp, 'L', 'G');
 }
 
-void file_set_section_org(file_t *file, const char *name, int value)
+void file_set_section_org(file_t* file, const char* name, int value)
 {
 	if (opt_obj_verbose)
 		printf("File '%s': set section '%s' ORG to $%04X\n",
-			str_data(file->filename), name, value);
+			utstr_body(file->filename), name, value);
 
 	// search file for section
-	objfile_t *obj;
+	objfile_t* obj;
 	DL_FOREACH(file->objs, obj) {
 
 		if (opt_obj_verbose)
-			printf("Block '%s'\n", str_data(obj->signature));
+			printf("Block '%s'\n", utstr_body(obj->signature));
 
-		section_t *section;
+		section_t* section;
 		DL_FOREACH(obj->sections, section) {
-			if (strcmp(str_data(section->name), name) == 0) {
+			if (strcmp(utstr_body(section->name), name) == 0) {
 				if (opt_obj_verbose)
-					printf("  section %s ORG -> $%04X\n", 
-						str_len(section->name) > 0 ? str_data(section->name) : "\"\"", 
+					printf("  section %s ORG -> $%04X\n",
+						utstr_len(section->name) > 0 ? utstr_body(section->name) : "\"\"",
 						value);
 				section->org = value;
 			}
 			else {
 				if (opt_obj_verbose)
-					printf("  skip section %s\n", 
-						str_len(section->name) > 0 ? str_data(section->name) : "\"\"");
+					printf("  skip section %s\n",
+						utstr_len(section->name) > 0 ? utstr_body(section->name) : "\"\"");
 			}
 		}
 	}
 }
 
-void file_set_section_align(file_t *file, const char *name, int value)
+void file_set_section_align(file_t* file, const char* name, int value)
 {
 	if (opt_obj_verbose)
 		printf("File '%s': set section '%s' ALIGN to $%04X\n",
-			str_data(file->filename), name, value);
+			utstr_body(file->filename), name, value);
 
 	// search file for section
-	objfile_t *obj;
+	objfile_t* obj;
 	DL_FOREACH(file->objs, obj) {
 
 		if (opt_obj_verbose)
-			printf("Block '%s'\n", str_data(obj->signature));
+			printf("Block '%s'\n", utstr_body(obj->signature));
 
-		section_t *section;
+		section_t* section;
 		DL_FOREACH(obj->sections, section) {
-			if (strcmp(str_data(section->name), name) == 0) {
+			if (strcmp(utstr_body(section->name), name) == 0) {
 				if (opt_obj_verbose)
 					printf("  section %s ALIGN -> $%04X\n",
-						str_len(section->name) > 0 ? str_data(section->name) : "\"\"",
+						utstr_len(section->name) > 0 ? utstr_body(section->name) : "\"\"",
 						value);
 				section->align = value;
 			}
 			else {
 				if (opt_obj_verbose)
 					printf("  skip section %s\n",
-						str_len(section->name) > 0 ? str_data(section->name) : "\"\"");
+						utstr_len(section->name) > 0 ? utstr_body(section->name) : "\"\"");
 			}
 		}
 	}

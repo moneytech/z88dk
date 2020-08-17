@@ -1,7 +1,7 @@
 #------------------------------------------------------------------------------
 # Z88DK Z80 Module Assembler
 #
-# Copyright (C) Paulo Custodio, 2011-2017
+# Copyright (C) Paulo Custodio, 2011-2019
 # License: http://www.perlfoundation.org/artistic_license_2_0
 # Repository: https://github.com/z88dk/z88dk
 #------------------------------------------------------------------------------
@@ -39,7 +39,6 @@ TEST_SRC_LIB	:= t/testlib.c
 # variables
 #------------------------------------------------------------------------------
 TARGET 			= $(PROJ)$(EXESUFFIX)
-MSVC_TARGET 	= ../../win32/Debug/$(TARGET)
 
 OPT 			= -O3
 
@@ -76,6 +75,17 @@ parse.o: parse.c
 	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) -O0 -c -o $@ $<
 
 #------------------------------------------------------------------------------
+# z80asm2
+#------------------------------------------------------------------------------
+#all: z80asm2$(EXESUFFIX)
+#
+#z80asm2$(EXESUFFIX): dev/z80asm2/z80asm2$(EXESUFFIX)
+#	cp dev/z80asm2/z80asm2$(EXESUFFIX) z80asm2$(EXESUFFIX)
+#
+#dev/z80asm2/z80asm2$(EXESUFFIX): $(wildcard dev/z80asm2/*.c dev/z80asm2/*.h)
+#	$(MAKE) -C dev/z80asm2
+#
+#------------------------------------------------------------------------------
 # libraries
 #------------------------------------------------------------------------------
 .PHONY: z80asm_lib
@@ -96,6 +106,7 @@ clean::
 #------------------------------------------------------------------------------
 .PHONY: dev
 dev:
+	perl asmstyle.pl dev/z80asm_lib/*.asm
 	$(MAKE) -C tt
 	$(MAKE) -C lib
 	$(MAKE) -f dev/Makefile
@@ -105,7 +116,7 @@ clean::
 	$(MAKE) -C lib clean
 
 #------------------------------------------------------------------------------
-# intall
+# install
 #------------------------------------------------------------------------------
 install: $(TARGET) z80asm_lib
 	$(INSTALL) $(TARGET)     $(PREFIX)/bin/$(EXEC_PREFIX)$(TARGET)
@@ -126,6 +137,7 @@ clean::
 	$(RM) *.log  $(LOCAL_LIB)/*.log  $(LOCAL_LIB)/t/*.log  $(LOCAL_LIB)/t/uthash/*.log
 	$(RM) *~     $(LOCAL_LIB)/*~     $(LOCAL_LIB)/t/*~     $(LOCAL_LIB)/t/uthash/*~
 	$(RM) -rf Debug Release x1 x2 x3
+	$(RM) $(OBJS) $(TEST_SRC_LIB:.c=.o)
 
 #------------------------------------------------------------------------------
 # test
@@ -133,12 +145,12 @@ clean::
 all: t/libtestlib.a
 
 t/libtestlib.a : $(OBJS) $(TEST_SRC_LIB:.c=.o)
-	ar rcs t/libtestlib.a $(OBJS:$(PROJ).o=) $(TEST_SRC_LIB:.c=.o)
+	ar rcs t/libtestlib.a $(OBJS:main.o=) $(TEST_SRC_LIB:.c=.o)
 
 $(TEST_SRC_MAIN:.c=.o) : t/libtestlib.a
 
 .o.out :
-	$(CC) $(CFLAGS) $< -o $(<:.o=$(EXESUFFIX)) $(LDFLAGS) -Lt -ltestlib
+	$(CC) $(LOCAL_CFLAGS) $(CFLAGS) $< -o $(<:.o=$(EXESUFFIX)) $(LDFLAGS) -Lt -ltestlib
 	$(<:.o=$(EXESUFFIX)) 2> $@~
 	diff -w $(<:.o=.bmk) $@~
 	mv -f $@~ $@
@@ -146,12 +158,19 @@ $(TEST_SRC_MAIN:.c=.o) : t/libtestlib.a
 clean::
 	$(RM) t/libtestlib.a t/*.o t/*.out lib/t/*.o lib/t/*.out $(TEST_SRC_MAIN:.c=$(EXESUFFIX))
 
+all:
+	perl dev/cpu2/cpu.pl
+
 test: $(TARGET) z80asm_lib
 	$(MAKE) dev
 	$(MAKE) z80asm_lib
-	#$(MAKE) -C dev\z80asm_lib test
 	$(MAKE) prove_c
 	$(MAKE) prove_perl
+
+testdev:
+	$(MAKE) -C dev/z80asm_lib test
+	$(MAKE) -C dev/z80asm2 test
+	perl dev/cpu2/cpu.pl -s test
 
 testlib:
 	$(MAKE) -C lib test
@@ -159,10 +178,8 @@ testlib:
 prove_c: t/libtestlib.a $(TEST_SRC_MAIN:.c=.o) $(TEST_SRC_MAIN:.c=.out)
 
 prove_perl: $(TARGET)
+	perl -S prove -It2 --state=slow,save -j9 t2/*.t
 	perl -S prove t/*.t
-
-testmsvc : $(MSVC_TARGET)
-	$(MAKE) Z80ASM_EXE=$(MSVC_TARGET) prove
 
 clean::
 	$(RM) zcc_opt.def zcc_proj.lst
@@ -178,21 +195,14 @@ clean::
 	$(RM) zcc_opt.def mandel.bin   mandel.tap
 
 clean::
+	$(RM) -r *.dSYM
 	$(RM) $(TARGET) $(LOCAL_LIB)/$(TARGET) test* $(LOCAL_LIB)/test*
 	$(RM) t/*.tmp $(LOCAL_LIB)/t/*.tmp t/dev/*.tmp
-
-#------------------------------------------------------------------------------
-# build with msvc - need to build manualy, devenv not available in Express
-#------------------------------------------------------------------------------
-$(MSVC_TARGET) : $(wildcard *.c) $(wildcard *.h)
-	@echo Build $(PROJ) inside Microsoft Visual C++ 2010 Express
-	@exit 1
-
 
 #------------------------------------------------------------------------------
 # Dependencies
 #------------------------------------------------------------------------------
 clean::
-	rm -f $(DEPENDS)
+	$(RM) $(DEPENDS)
 
 -include $(DEPENDS)

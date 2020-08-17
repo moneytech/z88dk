@@ -27,6 +27,14 @@ typedef double double_t;
 #endif
 #endif
 
+#ifndef _FLOAT16_T
+#define _FLOAT16_T
+#ifndef __SCCZ80
+typedef short _Float16;            /* IEEE-754 half float type */
+#endif
+typedef _Float16 half_t;
+#endif
+
 #ifndef _SIZE_T
 #define _SIZE_T
 typedef unsigned int size_t;
@@ -55,6 +63,11 @@ typedef unsigned char bool_t;
 #ifndef _INO_T
 #define _INO_T
 typedef unsigned int ino_t;
+#endif
+
+#ifndef _NSECONDS_T
+#define _NSECONDS_T
+typedef unsigned long nseconds_t;
 #endif
 
 #ifndef _TIME_T
